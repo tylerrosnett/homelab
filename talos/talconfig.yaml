@@ -1,0 +1,78 @@
+clusterName: homelab
+endpoint: https://192.168.1.246:6443  # Talos VIP
+
+talosVersion: v1.13.2
+kubernetesVersion: v1.36.1
+
+cniConfig:
+  name: none  # Cilium installed out-of-band
+
+additionalApiServerCertSans:
+  - 192.168.1.246
+
+nodes:
+  - hostname: oak
+    ipAddress: 192.168.1.5
+    installDiskSelector:
+      size: '>= 200GB'
+      type: ssd
+    controlPlane: true
+    networkInterfaces:
+      - interface: eno1
+        dhcp: false
+        addresses:
+          - 192.168.1.5/24
+        routes:
+          - network: 0.0.0.0/0
+            gateway: 192.168.1.1
+        vip:
+          ip: 192.168.1.246
+
+  - hostname: maple
+    ipAddress: 192.168.1.6
+    installDiskSelector:
+      size: '>= 200GB'
+      type: ssd
+    controlPlane: true
+    networkInterfaces:
+      - interface: eno1
+        dhcp: false
+        addresses:
+          - 192.168.1.6/24
+        routes:
+          - network: 0.0.0.0/0
+            gateway: 192.168.1.1
+        vip:
+          ip: 192.168.1.246
+
+  - hostname: pine
+    ipAddress: 192.168.1.7
+    installDiskSelector:
+      size: '>= 200GB'
+      type: ssd
+    controlPlane: true
+    networkInterfaces:
+      - interface: eno1
+        dhcp: false
+        addresses:
+          - 192.168.1.7/24
+        routes:
+          - network: 0.0.0.0/0
+            gateway: 192.168.1.1
+        vip:
+          ip: 192.168.1.246
+
+controlPlane:
+  schematic:
+    customization:
+      systemExtensions:
+        officialExtensions:
+          - siderolabs/iscsi-tools
+          - siderolabs/util-linux-tools
+  patches:
+    - "@./patches/cluster-cni-none.yaml"
+    - "@./patches/cluster-proxy-disabled.yaml"
+    - "@./patches/machine-kubelet.yaml"
+
+patches:
+  - "@./patches/machine-time.yaml"

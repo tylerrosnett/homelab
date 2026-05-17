@@ -1,1 +1,10 @@
 .secrets
+
+# Talos generated configs (regenerated from talconfig.yaml — never commit)
+talos/clusterconfig/
+
+# age private key
+*.agekey
+
+# Local kubeconfig
+kubeconfig
