@@ -7,6 +7,8 @@ kubernetesVersion: v1.36.1
 cniConfig:
   name: none  # Cilium installed out-of-band
 
+allowSchedulingOnControlPlanes: true  # compact 3-node cluster — workloads share controlplanes
+
 additionalApiServerCertSans:
   - 192.168.1.246
 
