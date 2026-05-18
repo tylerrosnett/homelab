@@ -39,6 +39,6 @@ spec:
     txtOwnerId: homelab
     txtPrefix: edns-
     interval: 1m
-    logLevel: debug
+    logLevel: info
     serviceMonitor:
       enabled: false
