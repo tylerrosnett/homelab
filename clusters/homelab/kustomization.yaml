@@ -8,4 +8,5 @@ resources:
   - network/cilium-loadbalancer.yaml
   - security/cert-manager.yaml
   - security/cert-manager-issuers.yaml
+  - network/gateway.yaml
   - storage/longhorn
