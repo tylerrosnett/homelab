@@ -8,3 +8,6 @@ talos/clusterconfig/
 
 # Local kubeconfig
 kubeconfig
+
+# local docs
+docs/

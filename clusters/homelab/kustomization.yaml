@@ -12,4 +12,7 @@ resources:
   - network/external-dns.yaml
   - network/cloudflare-tunnel.yaml
   - storage/longhorn
+  - observability/kube-prometheus-stack.yaml
+  - observability/loki.yaml
+  - observability/alloy.yaml
   - apps
