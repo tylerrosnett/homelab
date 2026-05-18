@@ -3,8 +3,6 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - repository.yaml
+  - secrets/oidc.sops.yaml
   - helmrelease.yaml
-  - grafana-httproute.yaml
-  - grafana-networkpolicy.yaml
-  - prometheus-httproute.yaml
-  - alertmanager-httproute.yaml
+  - httproute.yaml
