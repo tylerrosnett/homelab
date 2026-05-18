@@ -9,5 +9,6 @@ spec:
       app: hello
   ingress:
     - fromEntities:
+        - ingress
         - host
         - remote-node
