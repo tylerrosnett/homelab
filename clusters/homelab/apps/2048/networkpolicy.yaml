@@ -1,0 +1,14 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: game-2048-ingress
+  namespace: "2048"
+spec:
+  endpointSelector:
+    matchLabels:
+      app: game-2048
+  ingress:
+    - fromEntities:
+        - ingress
+        - host
+        - remote-node
