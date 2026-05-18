@@ -2,7 +2,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: game-2048
-  namespace: "2048"
+  namespace: game-2048
 spec:
   interval: 30m
   chart:

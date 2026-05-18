@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
   - whoami
   - hello-public
-  - "2048"
+  - game-2048
