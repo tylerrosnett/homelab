@@ -6,6 +6,10 @@ metadata:
 spec:
   dependsOn:
     - name: gateway-api
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
   interval: 10m
   retryInterval: 1m
   timeout: 10m
