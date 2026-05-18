@@ -15,4 +15,5 @@ resources:
   - observability/kube-prometheus-stack.yaml
   - observability/loki.yaml
   - observability/alloy.yaml
+  - observability/flux-monitoring.yaml
   - apps
