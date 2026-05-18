@@ -9,4 +9,6 @@ resources:
   - security/cert-manager.yaml
   - security/cert-manager-issuers.yaml
   - network/gateway.yaml
+  - network/external-dns.yaml
   - storage/longhorn
+  - apps

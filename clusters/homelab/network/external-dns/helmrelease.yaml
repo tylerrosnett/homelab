@@ -1,0 +1,42 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: external-dns
+  namespace: external-dns
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: external-dns
+      version: 1.21.1
+      sourceRef:
+        kind: HelmRepository
+        name: external-dns
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    provider:
+      name: cloudflare
+    env:
+      - name: CF_API_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: cloudflare-api-token
+            key: api-token
+    sources:
+      - gateway-httproute
+    domainFilters:
+      - ik8s.tylerrosnett.com
+    policy: sync
+    registry: txt
+    txtOwnerId: homelab
+    txtPrefix: edns-
+    interval: 1m
+    logLevel: info
+    serviceMonitor:
+      enabled: false
