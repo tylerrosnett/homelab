@@ -26,7 +26,7 @@ spec:
               kubernetes.io/metadata.name: kube-system
           podSelector:
             matchLabels:
-              gateway.networking.k8s.io/gateway-name: cf-tunnel
+              k8s-app: cilium-envoy
       ports:
         - port: 5678
           protocol: TCP
