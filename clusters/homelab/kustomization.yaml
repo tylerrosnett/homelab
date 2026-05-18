@@ -5,4 +5,5 @@ resources:
   - system/kubelet-csr-approver
   - network/cilium
   - security/cert-manager
+  - security/cert-manager-issuers.yaml
   - storage/longhorn
