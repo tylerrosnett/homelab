@@ -10,5 +10,6 @@ resources:
   - security/cert-manager-issuers.yaml
   - network/gateway.yaml
   - network/external-dns.yaml
+  - network/cloudflare-tunnel.yaml
   - storage/longhorn
   - apps

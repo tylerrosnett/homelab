@@ -1,15 +1,15 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: whoami
-  namespace: whoami
+  name: hello
+  namespace: hello-public
 spec:
   parentRefs:
-    - name: cilium-gateway
+    - name: cf-tunnel
       namespace: kube-system
   hostnames:
-    - whoami.internal.tylerrosnett.com
+    - hello.tylerrosnett.com
   rules:
     - backendRefs:
-        - name: whoami
+        - name: hello
           port: 80

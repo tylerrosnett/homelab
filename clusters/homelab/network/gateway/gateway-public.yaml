@@ -1,0 +1,18 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: cf-tunnel
+  namespace: kube-system
+spec:
+  gatewayClassName: cilium-cluster-only
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: '*.tylerrosnett.com'
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              expose-public: "true"

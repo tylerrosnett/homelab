@@ -32,6 +32,8 @@ spec:
       - gateway-httproute
     domainFilters:
       - tylerrosnett.com
+    extraArgs:
+      - --regex-domain-filter=.+\.internal\.tylerrosnett\.com$
     policy: sync
     registry: txt
     txtOwnerId: homelab
