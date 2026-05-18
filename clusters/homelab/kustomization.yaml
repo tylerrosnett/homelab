@@ -4,4 +4,5 @@ resources:
   - flux-system
   - system/kubelet-csr-approver
   - network/cilium
+  - security/cert-manager
   - storage/longhorn

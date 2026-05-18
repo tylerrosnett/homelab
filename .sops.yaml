@@ -3,6 +3,6 @@ creation_rules:
   - path_regex: talos/talsecret\.sops\.yaml$
     age: age1seegwzyg0ldnm2jerlpsyzkcrqctytqthwdpf0h9fs20w4nngqlqsvpaa0
 
-  # All secrets under infrastructure controllers
-  - path_regex: infrastructure/.*/secrets/.*\.yaml$
+  # All secrets under any cluster's secrets/ subdir (Option 1 flat layout)
+  - path_regex: clusters/.*/secrets/.*\.yaml$
     age: age1seegwzyg0ldnm2jerlpsyzkcrqctytqthwdpf0h9fs20w4nngqlqsvpaa0
