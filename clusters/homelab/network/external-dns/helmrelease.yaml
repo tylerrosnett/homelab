@@ -31,7 +31,7 @@ spec:
     sources:
       - gateway-httproute
     domainFilters:
-      - ik8s.tylerrosnett.com
+      - tylerrosnett.com
     policy: sync
     registry: txt
     txtOwnerId: homelab
