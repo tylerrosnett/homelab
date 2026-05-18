@@ -1,0 +1,4 @@
+# Helm values for the flux-operator chart.
+# Defaults: https://github.com/controlplaneio-fluxcd/charts/blob/main/charts/flux-operator/values.yaml
+# Empty for now — chart defaults match what was installed imperatively, so adoption is a no-op.
+{}
