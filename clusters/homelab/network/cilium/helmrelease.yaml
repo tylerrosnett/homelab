@@ -22,6 +22,7 @@ spec:
     remediation:
       retries: 3
   values:
+    rollOutCiliumPods: true
     kubeProxyReplacement: true
     k8sServiceHost: 192.168.1.246
     k8sServicePort: 6443
