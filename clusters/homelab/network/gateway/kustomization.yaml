@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - gateway.yaml
   - gateway-public.yaml
+  - pfsense-redirect.yaml
