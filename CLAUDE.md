@@ -10,9 +10,10 @@ GitOps configuration for a 3-node Talos Linux Kubernetes homelab. Flat layout �
 - `clusters/homelab/flux-system/` — Flux bootstrap (flux-operator + FluxInstance) and root Kustomizations for the `homelab` cluster.
 - `clusters/homelab/network/` — CNI (Cilium), Gateway API CRDs, LB IP pool / L2 announce, Gateways (internal `*.ik8s` + public `*.k8s` for Cloudflare Tunnel), ExternalDNS, cloudflared.
 - `clusters/homelab/security/` — cert-manager + ClusterIssuers.
-- `clusters/homelab/storage/` — Longhorn.
-- `clusters/homelab/system/` — cluster-level helpers (e.g. kubelet-csr-approver).
-- `clusters/homelab/apps/` — workload manifests (deployments, services, HTTPRoutes, NetworkPolicies).
+- `clusters/homelab/storage/` — Longhorn (+ HTTPRoute exposing the UI internally).
+- `clusters/homelab/observability/` — kube-prometheus-stack (Prometheus, Alertmanager, Grafana), Loki single-binary, Grafana Alloy DaemonSet, Flux PodMonitor + dashboards.
+- `clusters/homelab/system/` — cluster-level helpers (`kubelet-csr-approver`, `cluster-admin-oidc` for the SOPS-encrypted OIDC ClusterRoleBinding).
+- `clusters/homelab/apps/` — workload manifests (deployments, services, HTTPRoutes, NetworkPolicies). Includes `headlamp` (cluster-admin dashboard with CF Access OIDC).
 - `docs/` — local notes (e.g. `docs/superpowers/plans/`); not deployed.
 
 Each subsystem follows the pattern: a directory with raw manifests + `kustomization.yaml`, and a sibling `<name>.yaml` Flux Kustomization wrapper that adds `dependsOn`, `decryption`, and `healthChecks`. The root `clusters/homelab/kustomization.yaml` lists those wrappers.
@@ -49,14 +50,15 @@ sops <file>                                                                   # 
 ## SOPS / secrets
 
 - Encryption is **age** with recipient `age1seegwzyg0ldnm2jerlpsyzkcrqctytqthwdpf0h9fs20w4nngqlqsvpaa0` (see `.sops.yaml`).
-- Auto-encrypted paths: `talos/talsecret.sops.yaml` and anything matching `clusters/.*/secrets/.*\.yaml`. When creating new secret files, place them under one of these paths so `.sops.yaml` rules apply automatically — otherwise they'll be committed in plaintext.
+- Auto-encrypted paths: `talos/talsecret.sops.yaml`, `talos/patches/*.sops.yaml` (encrypted Talos patches — talhelper auto-decrypts on `genconfig`), and anything matching `clusters/.*/secrets/.*\.yaml`. When creating new secret files, place them under one of these paths so `.sops.yaml` rules apply automatically — otherwise they'll be committed in plaintext.
+- Non-Secret resources can also be SOPS-encrypted (e.g. the ClusterRoleBinding at `system/cluster-admin-oidc/secrets/clusterrolebinding.sops.yaml` keeps the admin email out of plaintext git). Flux's KS-level `decryption: sops` patch (in `flux-system/flux-instance.yaml`) decrypts any kind, not just `Secret`.
 - The private key lives outside the repo; `*.agekey` and `.secrets` are gitignored.
 - `talos/clusterconfig/` is gitignored — never commit generated per-node configs.
 
 ## Conventions
 
 - Single source of truth for node config is `talos/talconfig.yaml` + `talos/patches/*.yaml`. Don't hand-edit generated configs under `clusterconfig/`; change the source and regenerate.
-- Patches in `talos/patches/` are referenced from `talconfig.yaml` via `@./patches/...` — keep them small and single-purpose (see existing `cluster-cni-none`, `cluster-proxy-disabled`, `machine-kubelet`, `machine-time`).
+- Patches in `talos/patches/` are referenced from `talconfig.yaml` via `@./patches/...` — keep them small and single-purpose (see existing `cluster-cni-none`, `cluster-proxy-disabled`, `machine-kubelet`, `machine-time`). Sensitive patches use the `.sops.yaml` suffix (e.g. `cluster-apiserver-oidc.sops.yaml`) so talhelper decrypts them at config-gen time and the plaintext only lands in gitignored `clusterconfig/`.
 - NTP is pinned to `time.cloudflare.com`.
 
 ## Gateway pattern (adding new apps)
@@ -73,7 +75,9 @@ App namespace doesn't need any special label. Create:
 - `Deployment` + `Service`
 - `HTTPRoute` with `parentRefs: [{ name: cilium-gateway, namespace: kube-system }]` and `hostnames: [<name>.internal.tylerrosnett.com]`
 
-ExternalDNS auto-publishes `<name>.internal.tylerrosnett.com → 192.168.1.200` to Cloudflare DNS (regex-scoped to `.internal.`). TLS via the existing wildcard cert.
+ExternalDNS auto-publishes `<name>.internal.tylerrosnett.com → 192.168.1.200` to Cloudflare DNS (regex `^(tylerrosnett\.com|.+\.internal\.tylerrosnett\.com)$` — apex match is required for zone discovery, even though only `*.internal.*` records get managed). TLS via the existing wildcard cert.
+
+Optional polish: add a **Bookmark application** in Cloudflare Zero Trust (Access → Applications → Add → Bookmark) pointing at the new internal hostname so it shows up in the App Launcher (`https://tylerrosnett.cloudflareaccess.com/`). Bookmarks don't gate the destination (it's still LAN-only), just provide a directory.
 
 ### Adding a public-internet app
 
@@ -87,3 +91,29 @@ DNS for public apps relies on the wildcard CNAME `*.tylerrosnett.com → <tunnel
 ### L2 announcement scoping
 
 `CiliumL2AnnouncementPolicy/default-l2-policy` has `serviceSelector: { lb-announce: "true" }`. Only services with that label get their LB IP announced on the LAN. The internal gateway sets it via `spec.infrastructure.labels` on the Gateway. Don't label services you don't want LAN-reachable.
+
+## Observability conventions
+
+- Everything lives in `monitoring` namespace.
+- The namespace **must** carry `pod-security.kubernetes.io/enforce: privileged` — node-exporter needs `hostNetwork`/`hostPID` and PSA `restricted` will silently block its DaemonSet pods from scheduling (no pods created at all). Same pattern as `longhorn-system`.
+- KPS HelmRelease has Talos-specific port overrides for kube-controller-manager (`10257`), kube-scheduler (`10259`), kube-etcd (`2381`), and `kubeProxy.enabled: false` (kube-proxy is disabled in this cluster). Don't forget these when bumping KPS or troubleshooting broken ServiceMonitor targets.
+- Prometheus selector flips: `podMonitorSelectorNilUsesHelmValues: false` etc — so all PodMonitors/ServiceMonitors cluster-wide get picked up regardless of the `release` label. Required for Flux's PodMonitor in `flux-system` to be scraped.
+- Grafana uses `deploymentStrategy: { type: Recreate, rollingUpdate: null }`. With a RWO Longhorn PVC, the default `RollingUpdate` deadlocks (new pod waits forever for PVC). Explicitly setting `rollingUpdate: null` is required because Helm's deep-merge otherwise keeps the chart's default `maxSurge`/`maxUnavailable`, which the K8s API rejects when `type: Recreate`.
+- Dashboards are loaded via Grafana's sidecar by labeling ConfigMaps `grafana_dashboard: "1"` (KPS values set `sidecar.dashboards.searchNamespace: ALL` so the sidecar discovers from any namespace).
+
+## OIDC auth (Cloudflare Access SaaS)
+
+The cluster trusts a single Cloudflare Access SaaS OIDC application for all interactive auth. **Only GitHub OAuth is enabled as a CF Access login method** (email PIN and all other IdPs disabled in Zero Trust → Settings → Authentication). This means anyone reaching cluster auth must have a GitHub account permitted by the CF Access Rule Group.
+
+- **kube-apiserver** validates id_tokens via `--oidc-issuer-url`, `--oidc-client-id`, `--oidc-username-claim=email` (set in `talos/patches/cluster-apiserver-oidc.sops.yaml`, SOPS-encrypted).
+- **ClusterRoleBinding** at `clusters/homelab/system/cluster-admin-oidc/secrets/clusterrolebinding.sops.yaml` (SOPS-encrypted) maps the user email → `cluster-admin`.
+- **Headlamp** (`apps/headlamp/`) uses the same SaaS app via browser flow. Helm values inject OIDC creds from the SOPS secret via Flux's `spec.valuesFrom` (not `secret.create: false`, which hits a chart bug that skips OIDC env injection).
+- **kubectl** uses `kubelogin` against the same app with `http://localhost:8000` as an additional redirect URL on the SaaS app.
+
+**CF Access SaaS OIDC gotchas** (don't re-derive these):
+- **PKCE is required** by CF for SaaS apps. Headlamp values must set `config.oidc.usePKCE: true`; kubelogin must pass `--oidc-pkce-method=S256`. Without it CF rejects with `code_challenge is required for this client`.
+- **No refresh tokens.** The `offline_access` scope causes CF to return `invalid_scope`. Sessions die at the configured CF Access app session TTL (24h max). Don't request `offline_access`.
+- **Custom claims on SaaS apps can only map IdP attributes**, not literal strings or Rule Group references. So you can't synthesize a `groups` claim with `homelab-admins` from CF alone — needs to come from a GitHub team or Google Workspace group. For single-user homelab, just bind by email and SOPS-encrypt the CRB.
+- **Identity endpoint** for debugging claims: `https://tylerrosnett.cloudflareaccess.com/cdn-cgi/access/get-identity` (after logging in to any CF Access app). Returns session-level claims as JSON. Force re-auth via `https://tylerrosnett.cloudflareaccess.com/cdn-cgi/access/logout`.
+
+When adding a new app that should be behind CF Access (rather than just LAN-only), prefer reusing the existing SaaS app's client ID by adding a new redirect URL, or create a new SaaS app if isolation matters. Either way: PKCE on, no `offline_access`, JWT scope `openid email profile groups`.

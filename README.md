@@ -15,6 +15,8 @@ GitOps configuration for a 3-node [Talos Linux](https://www.talos.dev/) Kubernet
 | Certs | cert-manager + Let's Encrypt (DNS01 via Cloudflare) |
 | DNS | ExternalDNS → Cloudflare (internal hostnames only) |
 | Ingress | Cilium Gateway API — internal gateway on LAN, public gateway behind cloudflared |
+| Observability | kube-prometheus-stack 85.1.3, Loki 7.0.0 single-binary, Grafana Alloy 1.8.1 DaemonSet |
+| Auth | Cloudflare Access SaaS OIDC → kube-apiserver, Headlamp, and kubectl (via kubelogin) |
 
 ## Repository layout
 
@@ -32,9 +34,16 @@ clusters/homelab/
   security/
     cert-manager/                   cert-manager HelmRelease + Cloudflare token
     cert-manager-issuers/           Let's Encrypt staging + prod ClusterIssuers
-  storage/longhorn/                 Longhorn HelmRelease
-  system/kubelet-csr-approver/      Auto-approves kubelet serving CSRs
-  apps/                             Workloads (whoami, hello-public, game-2048, ...)
+  storage/longhorn/                 Longhorn HelmRelease (+ HTTPRoute for UI)
+  observability/
+    kube-prometheus-stack/          Prometheus + Alertmanager + Grafana (CF Access JWT)
+    loki/                           Loki single-binary
+    alloy/                          Grafana Alloy DaemonSet (logs → Loki)
+    flux-monitoring/                Flux PodMonitor + dashboards (ConfigMaps)
+  system/
+    kubelet-csr-approver/           Auto-approves kubelet serving CSRs
+    cluster-admin-oidc/             ClusterRoleBinding (SOPS) binding CF Access user → cluster-admin
+  apps/                             Workloads (whoami, hello-public, game-2048, headlamp, ...)
 docs/                               Local notes; not deployed
 ```
 
@@ -46,6 +55,7 @@ Pattern: each subsystem is a directory of raw manifests with a `kustomization.ya
 - **Public apps** live at `<name>.tylerrosnett.com`. DNS is a wildcard CNAME pointing at the Cloudflare tunnel; Cloudflare terminates TLS at its edge and forwards through the tunnel to the in-cluster `cf-tunnel` Gateway over plain HTTP.
 - The public gateway gates which namespaces can attach routes by matching the `expose-public: "true"` label on the namespace.
 - L2 announcement is opt-in via the `lb-announce: "true"` label on the LoadBalancer Service (set on the internal gateway, not the public one).
+- **Redirect-only HTTPRoutes** are possible without any backend Service — see `network/gateway/pfsense-redirect.yaml` for `pfsense.internal.tylerrosnett.com` → 302 to `https://192.168.1.1` via Gateway API's `RequestRedirect` filter.
 
 ## Adding a new app
 
@@ -78,6 +88,35 @@ Then add `<name>` to `clusters/homelab/apps/kustomization.yaml`. The wildcard `*
 
 Important: don't use multi-level hostnames for public apps (Cloudflare's free Universal SSL only covers one wildcard level).
 
+## Observability
+
+Stack lives in the `monitoring` namespace.
+
+- **Prometheus** (50Gi Longhorn PVC, 14d retention) — scrapes all PodMonitors/ServiceMonitors cluster-wide (KPS's `*SelectorNilUsesHelmValues: false` flips). Talos overrides: kube-controller-manager `10257`, kube-scheduler `10259`, etcd `2381`, kube-proxy disabled.
+- **Alertmanager** (5Gi PVC).
+- **Grafana** (5Gi PVC) — only public-facing piece of observability. Exposed at `grafana.tylerrosnett.com` via the `cf-tunnel` Gateway. Auth uses Cloudflare Access JWT (`auth.jwt` against CF's JWKS). Login form disabled; users auto-create as Admin on first JWT login.
+- **Loki** single-binary (50Gi PVC, filesystem store).
+- **Grafana Alloy** DaemonSet scraping every namespace's pod logs → Loki.
+- **Flux dashboards** as ConfigMaps (label `grafana_dashboard: "1"`), PodMonitor for flux-system controllers — see `observability/flux-monitoring/`.
+
+The `monitoring` namespace carries `pod-security.kubernetes.io/enforce: privileged` because node-exporter needs `hostNetwork`/`hostPID`. Grafana uses `Recreate` deployment strategy (RWO PVC + `RollingUpdate` deadlocks).
+
+Internal UIs exposed via `*.internal.tylerrosnett.com`: `longhorn`, `prometheus`, `alertmanager`, `headlamp`, `pfsense` (redirect-only).
+
+## Authentication
+
+The cluster trusts **Cloudflare Access SaaS OIDC** as an identity provider end-to-end. CF Access itself only accepts GitHub OAuth as a login method — email PIN and other IdPs are disabled in Zero Trust settings.
+
+- **kube-apiserver** has `--oidc-issuer-url`, `--oidc-client-id`, `--oidc-username-claim=email` set via a SOPS-encrypted Talos patch (`talos/patches/cluster-apiserver-oidc.sops.yaml`). The Talos rule under `.sops.yaml` for `talos/patches/.*\.sops\.yaml$` decrypts at `talhelper genconfig` time so plaintext stays in gitignored `clusterconfig/`.
+- **ClusterRoleBinding** at `clusters/homelab/system/cluster-admin-oidc/secrets/clusterrolebinding.sops.yaml` (SOPS-encrypted) maps the CF Access user email → `cluster-admin`.
+- **Headlamp** uses the same SaaS OIDC app via browser flow at `headlamp.internal.tylerrosnett.com/oidc-callback`. Helm values are injected from the encrypted `headlamp-oidc` secret via Flux's `valuesFrom` to work around a chart bug where `secret.create: false` skips OIDC env injection.
+- **kubectl** uses [`kubelogin`](https://github.com/int128/kubelogin) against the same SaaS app with redirect `http://localhost:8000`. See "Common operations" below for the kubeconfig wiring.
+
+**CF Access SaaS OIDC quirks** that took a while to debug:
+- **PKCE is required**. Both Headlamp (`usePKCE: true`) and kubelogin (`--oidc-pkce-method=S256`) must opt in. CF rejects with `code_challenge is required for this client` otherwise.
+- **Refresh tokens are NOT issued**. The `offline_access` scope causes `invalid_scope` errors. Sessions die at the configured session TTL (extend via Application → Session duration up to 24h).
+- **Group claims need an IdP source** (e.g. GitHub teams). Custom claims on the SaaS app can only map IdP attributes, not literal strings or Rule Groups. Email-based RBAC is the practical fallback for single-user homelabs.
+
 ## Secrets
 
 Encrypted with [sops](https://github.com/getsops/sops) + age. Files matching `clusters/.*/secrets/.*\.yaml` are auto-encrypted by the `.sops.yaml` rules. The age private key lives outside the repo.
@@ -108,6 +147,9 @@ flux reconcile kustomization flux-system --with-source
 # See sync state
 flux get kustomizations
 flux get helmreleases -A
+
+# Force kubelogin to re-authenticate (e.g. after CF session expires)
+rm -rf ~/.kube/cache/oidc-login/
 ```
 
 ## Notable design choices
@@ -115,5 +157,5 @@ flux get helmreleases -A
 - **Cilium installed out-of-band** via Flux HelmRelease (Talos CNI is `none`). kube-proxy is disabled; Cilium's BPF kube-proxy replacement handles it.
 - **Install disks selected by size/type** (`installDiskSelector: size: '>= 200GB', type: ssd`), not fixed `/dev/sdX` paths — names aren't stable across reboots when USB media is present.
 - **flux-operator + FluxInstance** instead of the classic `flux install`. The FluxInstance is itself reconciled by a Flux HelmRelease for self-management.
-- **Two ExternalDNS scopes**: domain filter set to `tylerrosnett.com` (zone discovery requires it), regex filter restricts ownership to `.+\.internal\.tylerrosnett\.com$` so the tunnel's public CNAMEs aren't touched.
+- **Two ExternalDNS scopes**: domain filter set to `tylerrosnett.com` (zone discovery requires it), regex filter `^(tylerrosnett\.com|.+\.internal\.tylerrosnett\.com)$` matches both the zone apex (so ExternalDNS can discover the hosted zone) AND the internal records it should manage. The zone apex match is required — without it, ExternalDNS silently skips every record with "no hosted zone matching record DNS Name was detected".
 - **Public traffic terminates plaintext inside the cluster** (Cloudflare → cloudflared → public gateway is HTTP). Cilium's identity-aware policy on backend pods uses the `ingress` entity to allow only envoy-originated traffic.
