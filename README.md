@@ -15,8 +15,10 @@ GitOps configuration for a 3-node [Talos Linux](https://www.talos.dev/) Kubernet
 | Certs | cert-manager + Let's Encrypt (DNS01 via Cloudflare) |
 | DNS | ExternalDNS → Cloudflare (internal hostnames only) |
 | Ingress | Cilium Gateway API — internal gateway on LAN, public gateway behind cloudflared |
-| Observability | kube-prometheus-stack 85.1.3, Loki 7.0.0 single-binary, Grafana Alloy 1.8.1 DaemonSet |
+| Observability | kube-prometheus-stack 85.1.3, Loki 7.0.0 single-binary, Grafana Alloy 1.8.1 DaemonSet, Hubble UI |
+| Uptime monitoring | blackbox-exporter probes 8 endpoints; alerts → Discord via Alertmanager `discord_configs` |
 | Auth | Cloudflare Access SaaS OIDC → kube-apiserver, Headlamp, and kubectl (via kubelogin) |
+| Dependency updates | Renovate (Mend-hosted) — config in `renovate.json`, opens grouped PRs nightly/weekends |
 
 ## Repository layout
 
@@ -40,11 +42,14 @@ clusters/homelab/
     loki/                           Loki single-binary
     alloy/                          Grafana Alloy DaemonSet (logs → Loki)
     flux-monitoring/                Flux PodMonitor + dashboards (ConfigMaps)
+    blackbox-exporter/              Blackbox probes, alert rules, Discord AlertmanagerConfig
+    extra-dashboards/               cert-manager / Cilium / Longhorn / Node Exporter / Loki / Blackbox dashboards
   system/
     kubelet-csr-approver/           Auto-approves kubelet serving CSRs
     cluster-admin-oidc/             ClusterRoleBinding (SOPS) binding CF Access user → cluster-admin
   apps/                             Workloads (whoami, hello-public, game-2048, headlamp, ...)
 docs/                               Local notes; not deployed
+renovate.json                       Renovate config (managed by Mend's hosted GitHub App)
 ```
 
 Pattern: each subsystem is a directory of raw manifests with a `kustomization.yaml`, paired with a sibling `<name>.yaml` Flux Kustomization wrapper that adds `dependsOn`, SOPS `decryption`, and health checks. The root `clusters/homelab/kustomization.yaml` lists the wrappers.
@@ -101,7 +106,22 @@ Stack lives in the `monitoring` namespace.
 
 The `monitoring` namespace carries `pod-security.kubernetes.io/enforce: privileged` because node-exporter needs `hostNetwork`/`hostPID`. Grafana uses `Recreate` deployment strategy (RWO PVC + `RollingUpdate` deadlocks).
 
-Internal UIs exposed via `*.internal.tylerrosnett.com`: `longhorn`, `prometheus`, `alertmanager`, `headlamp`, `pfsense` (redirect-only).
+Internal UIs exposed via `*.internal.tylerrosnett.com`: `longhorn`, `prometheus`, `alertmanager`, `headlamp`, `hubble` (Cilium flow observability — `hubble.relay.enabled` + `hubble.ui.enabled` on the Cilium HelmRelease), `pfsense` (redirect-only).
+
+Prometheus and Alertmanager both have `externalUrl` set to their `*.internal.tylerrosnett.com` hostnames so "Source" links in Alertmanager and links in Discord notifications resolve from a browser (otherwise they'd point at cluster-internal service DNS).
+
+**Extra dashboards** (`observability/extra-dashboards/`): cert-manager, Cilium Agent, Longhorn, Node Exporter Full (grafana.com #1860), Loki, Blackbox Exporter. Loaded the same way as Flux dashboards — kustomize `configMapGenerator` with `grafana_dashboard: "1"` label.
+
+## Uptime monitoring and alerts
+
+`observability/blackbox-exporter/`:
+
+- **`prometheus-blackbox-exporter` HelmRelease** with `http_2xx`, `http_2xx_insecure`, and `tcp_connect` probe modules. Exports `probe_success` / `probe_duration_seconds` / `probe_ssl_earliest_cert_expiry` metrics.
+- **`Probe` CRDs** (`public-endpoints`, `internal-endpoints`) — 8 URLs scraped every 60s, labeled `category=public|internal`. Edit `probes.yaml` to add/remove targets.
+- **`PrometheusRule`** with 4 alerts: `EndpointDown` (probe_success=0 for 3m), `EndpointSlow` (>5s for 10m), `CertExpiringSoon` (<14d), `CertExpired`.
+- **`AlertmanagerConfig`** — routes alerts with `severity =~ warning|critical` to a Discord webhook (URL in `secrets/discord-webhook.sops.yaml`). Watchdog and other low-priority alerts are filtered out by the severity matcher.
+
+KPS values include `alertmanagerConfigSelector: { matchLabels: { alertmanagerConfig: discord } }` so Alertmanager picks up the CRD.
 
 ## Authentication
 
@@ -159,3 +179,4 @@ rm -rf ~/.kube/cache/oidc-login/
 - **flux-operator + FluxInstance** instead of the classic `flux install`. The FluxInstance is itself reconciled by a Flux HelmRelease for self-management.
 - **Two ExternalDNS scopes**: domain filter set to `tylerrosnett.com` (zone discovery requires it), regex filter `^(tylerrosnett\.com|.+\.internal\.tylerrosnett\.com)$` matches both the zone apex (so ExternalDNS can discover the hosted zone) AND the internal records it should manage. The zone apex match is required — without it, ExternalDNS silently skips every record with "no hosted zone matching record DNS Name was detected".
 - **Public traffic terminates plaintext inside the cluster** (Cloudflare → cloudflared → public gateway is HTTP). Cilium's identity-aware policy on backend pods uses the `ingress` entity to allow only envoy-originated traffic.
+- **Talos kube-controller-manager and kube-scheduler bind to 0.0.0.0** via `patches/cluster-scheduler-controller-bind.yaml`. Default Talos behavior binds them to 127.0.0.1, so Prometheus scrapes via node IP fail. Without the patch you get perpetual `KubeSchedulerInstanceUnreachable` / `KubeControllerManagerInstanceUnreachable` / `TargetDown` alerts.

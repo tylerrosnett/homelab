@@ -11,10 +11,11 @@ GitOps configuration for a 3-node Talos Linux Kubernetes homelab. Flat layout �
 - `clusters/homelab/network/` — CNI (Cilium), Gateway API CRDs, LB IP pool / L2 announce, Gateways (internal `*.ik8s` + public `*.k8s` for Cloudflare Tunnel), ExternalDNS, cloudflared.
 - `clusters/homelab/security/` — cert-manager + ClusterIssuers.
 - `clusters/homelab/storage/` — Longhorn (+ HTTPRoute exposing the UI internally).
-- `clusters/homelab/observability/` — kube-prometheus-stack (Prometheus, Alertmanager, Grafana), Loki single-binary, Grafana Alloy DaemonSet, Flux PodMonitor + dashboards.
+- `clusters/homelab/observability/` — kube-prometheus-stack (Prometheus, Alertmanager, Grafana), Loki single-binary, Grafana Alloy DaemonSet, Flux PodMonitor + dashboards, blackbox-exporter (uptime probes + Discord alerts), extra-dashboards (cert-manager / Cilium / Longhorn / Node Exporter Full / Loki / Blackbox JSONs as ConfigMaps).
 - `clusters/homelab/system/` — cluster-level helpers (`kubelet-csr-approver`, `cluster-admin-oidc` for the SOPS-encrypted OIDC ClusterRoleBinding).
 - `clusters/homelab/apps/` — workload manifests (deployments, services, HTTPRoutes, NetworkPolicies). Includes `headlamp` (cluster-admin dashboard with CF Access OIDC).
 - `docs/` — local notes (e.g. `docs/superpowers/plans/`); not deployed.
+- `renovate.json` — config for the Mend-hosted Renovate GitHub App. Detects HelmRelease chart versions, OCI/HTTPS HelmRepositories, kustomize images, GHA digests, plus custom regex managers for `talosVersion:` and `kubernetesVersion:` in `talconfig.yaml`. Opens PRs only after 6pm + weekends to avoid daytime noise. Renovate maintains a "Dependency Dashboard" issue tracking everything it finds.
 
 Each subsystem follows the pattern: a directory with raw manifests + `kustomization.yaml`, and a sibling `<name>.yaml` Flux Kustomization wrapper that adds `dependsOn`, `decryption`, and `healthChecks`. The root `clusters/homelab/kustomization.yaml` lists those wrappers.
 
@@ -100,6 +101,9 @@ DNS for public apps relies on the wildcard CNAME `*.tylerrosnett.com → <tunnel
 - Prometheus selector flips: `podMonitorSelectorNilUsesHelmValues: false` etc — so all PodMonitors/ServiceMonitors cluster-wide get picked up regardless of the `release` label. Required for Flux's PodMonitor in `flux-system` to be scraped.
 - Grafana uses `deploymentStrategy: { type: Recreate, rollingUpdate: null }`. With a RWO Longhorn PVC, the default `RollingUpdate` deadlocks (new pod waits forever for PVC). Explicitly setting `rollingUpdate: null` is required because Helm's deep-merge otherwise keeps the chart's default `maxSurge`/`maxUnavailable`, which the K8s API rejects when `type: Recreate`.
 - Dashboards are loaded via Grafana's sidecar by labeling ConfigMaps `grafana_dashboard: "1"` (KPS values set `sidecar.dashboards.searchNamespace: ALL` so the sidecar discovers from any namespace).
+- **Talos kube-controller-manager + kube-scheduler must bind on 0.0.0.0** for Prometheus to scrape them. Default Talos binds to 127.0.0.1 only. Fix lives at `talos/patches/cluster-scheduler-controller-bind.yaml`. Symptom of missing this: perpetual `KubeSchedulerInstanceUnreachable` / `KubeControllerManagerInstanceUnreachable` / `TargetDown` alerts even with KPS's port overrides set.
+- **Prometheus + Alertmanager `externalUrl`** are set to `https://{prometheus,alertmanager}.internal.tylerrosnett.com`. Without these, "Source" links in Alertmanager UI and `generatorURL` in alert payloads default to in-cluster service DNS (`kube-prometheus-stack-prometheus.monitoring:9090`) which doesn't resolve outside the cluster.
+- **Longhorn manager restart-count cleanup is dangerous.** Deleting a `longhorn-manager` pod triggers an optimistic-concurrency race on Setting CR updates at startup (`Operation cannot be fulfilled on settings.longhorn.io "default-replica-count"`), which keeps fatal-exiting until contention settles. Symptom is a pod that keeps restarting after a clean delete. Resolution is to leave it alone or delete all longhorn-managers + driver-deployer together so they re-elect cleanly. Don't try to zero out their restart counts.
 
 ## OIDC auth (Cloudflare Access SaaS)
 
@@ -116,4 +120,16 @@ The cluster trusts a single Cloudflare Access SaaS OIDC application for all inte
 - **Custom claims on SaaS apps can only map IdP attributes**, not literal strings or Rule Group references. So you can't synthesize a `groups` claim with `homelab-admins` from CF alone — needs to come from a GitHub team or Google Workspace group. For single-user homelab, just bind by email and SOPS-encrypt the CRB.
 - **Identity endpoint** for debugging claims: `https://tylerrosnett.cloudflareaccess.com/cdn-cgi/access/get-identity` (after logging in to any CF Access app). Returns session-level claims as JSON. Force re-auth via `https://tylerrosnett.cloudflareaccess.com/cdn-cgi/access/logout`.
 
-When adding a new app that should be behind CF Access (rather than just LAN-only), prefer reusing the existing SaaS app's client ID by adding a new redirect URL, or create a new SaaS app if isolation matters. Either way: PKCE on, no `offline_access`, JWT scope `openid email profile groups`.
+When adding a new app that should be behind CF Access (rather than just LAN-only), prefer reusing the existing SaaS app's client ID by adding a new redirect URL, or create a new SaaS app if isolation matters. Either way: PKCE on, JWT scope `openid email profile groups offline_access` (refresh tokens are enabled on the existing SaaS app).
+
+## Uptime monitoring and Discord alerts
+
+`observability/blackbox-exporter/` owns the uptime side end-to-end:
+
+- **`prometheus-blackbox-exporter`** HelmRelease (community chart 11.10.0) with `http_2xx`, `http_2xx_insecure`, `tcp_connect` modules. ServiceMonitor enabled with `release: kube-prometheus-stack` label for KPS discovery.
+- **`Probe` CRDs** in `probes.yaml` — split into `public-endpoints` (3 URLs) and `internal-endpoints` (5 URLs), 60s interval. Add targets to the static list; don't add new Probe resources unless you need different modules/labels.
+- **`PrometheusRule`** in `rules.yaml` with 4 alerts: `EndpointDown`, `EndpointSlow`, `CertExpiringSoon`, `CertExpired`. All use `severity: warning|critical`.
+- **`AlertmanagerConfig`** in `alertmanagerconfig.yaml` — single route with `severity =~ warning|critical` matcher routes to a `discord_configs` receiver. Webhook URL pulled from `secrets/discord-webhook.sops.yaml` via `apiURL.name/key` Secret ref.
+- KPS values set `alertmanagerConfigSelector: { matchLabels: { alertmanagerConfig: discord } }` so the operator picks up the CRD. Required — by default KPS's selector matches nothing.
+- **Watchdog is suppressed** by the severity matcher (it's `severity: none`). Don't broaden the matcher or Discord gets a heartbeat ping every 30s.
+- **Live alert state is sticky** — Alertmanager keeps alerts in their original group until they resolve. After changing route matchers, restart the Alertmanager pod (`kubectl -n monitoring delete pod alertmanager-kube-prometheus-stack-alertmanager-0`) to force re-evaluation.
