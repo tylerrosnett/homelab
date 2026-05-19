@@ -28,7 +28,6 @@ spec:
     ingress:
       enabled: false
     config:
-      baseURL: https://headlamp.internal.tylerrosnett.com
       oidc:
         secret:
           create: false
