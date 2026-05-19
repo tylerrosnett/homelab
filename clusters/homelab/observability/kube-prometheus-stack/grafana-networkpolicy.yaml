@@ -12,3 +12,7 @@ spec:
         - ingress
         - host
         - remote-node
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: prometheus
+            io.kubernetes.pod.namespace: monitoring

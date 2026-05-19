@@ -75,6 +75,7 @@ controlPlane:
     - "@./patches/cluster-cni-none.yaml"
     - "@./patches/cluster-proxy-disabled.yaml"
     - "@./patches/cluster-apiserver-oidc.sops.yaml"
+    - "@./patches/cluster-scheduler-controller-bind.yaml"
     - "@./patches/machine-kubelet.yaml"
 
 patches:

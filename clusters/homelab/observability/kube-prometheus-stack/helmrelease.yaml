@@ -44,6 +44,7 @@ spec:
       enabled: false
     prometheus:
       prometheusSpec:
+        externalUrl: https://prometheus.internal.tylerrosnett.com
         retention: 14d
         podMonitorSelectorNilUsesHelmValues: false
         serviceMonitorSelectorNilUsesHelmValues: false
@@ -60,6 +61,7 @@ spec:
                   storage: 50Gi
     alertmanager:
       alertmanagerSpec:
+        externalUrl: https://alertmanager.internal.tylerrosnett.com
         alertmanagerConfigSelector:
           matchLabels:
             alertmanagerConfig: discord
