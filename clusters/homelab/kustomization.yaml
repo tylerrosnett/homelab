@@ -17,4 +17,5 @@ resources:
   - observability/loki.yaml
   - observability/alloy.yaml
   - observability/flux-monitoring.yaml
+  - observability/extra-dashboards.yaml
   - apps
