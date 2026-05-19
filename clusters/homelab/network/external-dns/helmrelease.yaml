@@ -33,7 +33,7 @@ spec:
     domainFilters:
       - tylerrosnett.com
     extraArgs:
-      - --regex-domain-filter=.+\.internal\.tylerrosnett\.com$
+      - --regex-domain-filter=^(tylerrosnett\.com|.+\.internal\.tylerrosnett\.com)$
     policy: sync
     registry: txt
     txtOwnerId: homelab
