@@ -12,6 +12,10 @@ spec:
     groupInterval: 5m
     repeatInterval: 12h
     receiver: discord
+    matchers:
+      - name: severity
+        matchType: "=~"
+        value: "warning|critical"
   receivers:
     - name: discord
       discordConfigs:
