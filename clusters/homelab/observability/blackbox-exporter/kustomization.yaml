@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - helmrelease.yaml
+  - probes.yaml
+  - rules.yaml
+  - secrets/discord-webhook.sops.yaml
+  - alertmanagerconfig.yaml

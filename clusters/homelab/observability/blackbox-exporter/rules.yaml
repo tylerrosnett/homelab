@@ -1,0 +1,43 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: blackbox-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: blackbox.rules
+      rules:
+        - alert: EndpointDown
+          expr: probe_success == 0
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Endpoint {{ $labels.instance }} is down"
+            description: "{{ $labels.instance }} ({{ $labels.category }}) has failed probes for 3+ minutes."
+        - alert: EndpointSlow
+          expr: probe_duration_seconds > 5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Endpoint {{ $labels.instance }} is slow"
+            description: "{{ $labels.instance }} response time > 5s for 10+ minutes (currently {{ $value | humanizeDuration }})."
+        - alert: CertExpiringSoon
+          expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 14
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "TLS cert for {{ $labels.instance }} expires in < 14 days"
+            description: "Cert at {{ $labels.instance }} expires in {{ $value | humanizeDuration }}."
+        - alert: CertExpired
+          expr: probe_ssl_earliest_cert_expiry - time() < 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "TLS cert for {{ $labels.instance }} has EXPIRED"
+            description: "{{ $labels.instance }}'s certificate expired {{ $value | humanizeDuration }} ago."

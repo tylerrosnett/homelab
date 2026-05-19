@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: public-endpoints
+  namespace: monitoring
+spec:
+  interval: 60s
+  scrapeTimeout: 30s
+  module: http_2xx
+  prober:
+    url: blackbox-exporter-prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+  targets:
+    staticConfig:
+      static:
+        - https://grafana.tylerrosnett.com
+        - https://hello.tylerrosnett.com
+        - https://2048.tylerrosnett.com
+      labels:
+        category: public
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: internal-endpoints
+  namespace: monitoring
+spec:
+  interval: 60s
+  scrapeTimeout: 30s
+  module: http_2xx
+  prober:
+    url: blackbox-exporter-prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+  targets:
+    staticConfig:
+      static:
+        - https://longhorn.internal.tylerrosnett.com
+        - https://prometheus.internal.tylerrosnett.com
+        - https://alertmanager.internal.tylerrosnett.com
+        - https://headlamp.internal.tylerrosnett.com
+        - https://hubble.internal.tylerrosnett.com
+      labels:
+        category: internal

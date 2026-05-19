@@ -1,0 +1,30 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: discord
+  namespace: monitoring
+  labels:
+    alertmanagerConfig: discord
+spec:
+  route:
+    groupBy: ["alertname", "instance"]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 12h
+    receiver: discord
+  receivers:
+    - name: discord
+      discordConfigs:
+        - apiURL:
+            name: discord-webhook
+            key: webhook-url
+          sendResolved: true
+          title: |
+            [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
+          message: |
+            {{ range .Alerts -}}
+            **{{ .Annotations.summary }}**
+            {{ .Annotations.description }}
+            *severity:* {{ .Labels.severity }}
+            *instance:* {{ .Labels.instance }}
+            {{ end }}

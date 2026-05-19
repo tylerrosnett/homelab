@@ -25,3 +25,7 @@ configMapGenerator:
     namespace: monitoring
     files:
       - dashboards/loki.json
+  - name: dashboard-blackbox-exporter
+    namespace: monitoring
+    files:
+      - dashboards/blackbox-exporter.json

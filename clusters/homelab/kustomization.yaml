@@ -18,4 +18,5 @@ resources:
   - observability/alloy.yaml
   - observability/flux-monitoring.yaml
   - observability/extra-dashboards.yaml
+  - observability/blackbox-exporter.yaml
   - apps
