@@ -5,10 +5,10 @@
     ":dependencyDashboard",
     ":semanticCommits",
     ":gitSignOff",
-    "helpers:pinGitHubActionDigests"
+    "helpers:pinGitHubActionDigests",
+    "schedule:nonOfficeHours"
   ],
   "timezone": "America/Los_Angeles",
-  "schedule": ["after 6pm on weekdays", "every weekend"],
   "prHourlyLimit": 4,
   "prConcurrentLimit": 10,
   "labels": ["dependencies"],
