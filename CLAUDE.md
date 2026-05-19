@@ -8,7 +8,7 @@ GitOps configuration for a 3-node Talos Linux Kubernetes homelab. Flat layout �
 
 - `talos/` — Talos node configuration via [talhelper](https://github.com/budimanjojo/talhelper); `talconfig.yaml` is the single source of truth.
 - `clusters/homelab/flux-system/` — Flux bootstrap (flux-operator + FluxInstance) and root Kustomizations for the `homelab` cluster.
-- `clusters/homelab/network/` — CNI (Cilium), Gateway API CRDs, LB IP pool / L2 announce, Gateways (internal `*.ik8s` + public `*.k8s` for Cloudflare Tunnel), ExternalDNS, cloudflared.
+- `clusters/homelab/network/` — CNI (Cilium), Gateway API CRDs, LB IP pool / L2 announce, Gateways (internal `*.ik8s` + public `*.k8s` for Cloudflare Tunnel), ExternalDNS, cloudflared, Tailscale operator + subnet-router Connectors.
 - `clusters/homelab/security/` — cert-manager + ClusterIssuers.
 - `clusters/homelab/storage/` — Longhorn (+ HTTPRoute exposing the UI internally).
 - `clusters/homelab/observability/` — kube-prometheus-stack (Prometheus, Alertmanager, Grafana), Loki single-binary, Grafana Alloy DaemonSet, Flux PodMonitor + dashboards, blackbox-exporter (uptime probes + Discord alerts), extra-dashboards (cert-manager / Cilium / Longhorn / Node Exporter Full / Loki / Blackbox JSONs as ConfigMaps).
@@ -121,6 +121,19 @@ The cluster trusts a single Cloudflare Access SaaS OIDC application for all inte
 - **Identity endpoint** for debugging claims: `https://tylerrosnett.cloudflareaccess.com/cdn-cgi/access/get-identity` (after logging in to any CF Access app). Returns session-level claims as JSON. Force re-auth via `https://tylerrosnett.cloudflareaccess.com/cdn-cgi/access/logout`.
 
 When adding a new app that should be behind CF Access (rather than just LAN-only), prefer reusing the existing SaaS app's client ID by adding a new redirect URL, or create a new SaaS app if isolation matters. Either way: PKCE on, JWT scope `openid email profile groups offline_access` (refresh tokens are enabled on the existing SaaS app).
+
+## Tailscale subnet router
+
+`network/tailscale/` (operator + CRD install) and `network/tailscale-connectors/` (Connector CRs) are split into two Flux Kustomizations because the Connector CRD is installed by the operator's chart — CRs can't be reconciled before the CRD exists. `tailscale-connectors` has `dependsOn: tailscale`.
+
+- OAuth client (Tailscale admin) provides the `operator-oauth` secret. The Helm chart's `oauth.clientId`/`oauth.clientSecret` are left empty in values; the secret is pre-created and the chart's deployment auto-references it via `envFrom`.
+- ACL must include `tagOwners: { tag:homelab: ["autogroup:admin"] }` — operator tags managed devices with `tag:homelab` (`operatorConfig.defaultTags` + `proxyConfig.defaultTags`).
+- **`tailscale` namespace needs `pod-security.kubernetes.io/enforce: privileged`** — subnet-router pods use privileged containers (sysctls + raw networking). Symptom of missing this: `FailedCreate` on the StatefulSet with `violates PodSecurity "baseline:latest": privileged`.
+- HA via 2 separate `Connector` CRs (subnet-router-a/b) advertising the same route. Tailscale handles failover between subnet routers automatically.
+- Routes must be approved in the Tailscale admin UI after pods register — this is one-time manual.
+- Split DNS in Tailscale admin forwards `*.internal.tylerrosnett.com` lookups to `192.168.1.1` (pfSense Unbound). Required so clients reaching the cluster over Tailscale resolve the internal hostnames correctly.
+
+**Pattern for any operator with CRDs + CRs in this repo:** split into two Flux Kustomizations (operator-installs-CRDs first, CRs second with `dependsOn`). Don't put both in one kustomize bundle — Flux dry-run validation fails on the CRs before the CRDs land.
 
 ## Uptime monitoring and Discord alerts
 

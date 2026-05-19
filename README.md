@@ -18,6 +18,7 @@ GitOps configuration for a 3-node [Talos Linux](https://www.talos.dev/) Kubernet
 | Observability | kube-prometheus-stack 85.1.3, Loki 7.0.0 single-binary, Grafana Alloy 1.8.1 DaemonSet, Hubble UI |
 | Uptime monitoring | blackbox-exporter probes 8 endpoints; alerts → Discord via Alertmanager `discord_configs` |
 | Auth | Cloudflare Access SaaS OIDC → kube-apiserver, Headlamp, and kubectl (via kubelogin) |
+| Remote access | Tailscale operator with 2 HA subnet routers advertising `192.168.1.0/24` |
 | Dependency updates | Renovate (Mend-hosted) — config in `renovate.json`, opens grouped PRs nightly/weekends |
 
 ## Repository layout
@@ -33,6 +34,8 @@ clusters/homelab/
     gateway/                        Internal + public Gateway resources
     external-dns/                   ExternalDNS HelmRelease + Cloudflare token
     cloudflare-tunnel/              cloudflared Deployment + tunnel token
+    tailscale/                      Tailscale operator + OAuth secret (installs CRDs)
+    tailscale-connectors/           Connector CRs — HA pair of subnet routers (depends on operator)
   security/
     cert-manager/                   cert-manager HelmRelease + Cloudflare token
     cert-manager-issuers/           Let's Encrypt staging + prod ClusterIssuers
@@ -61,6 +64,18 @@ Pattern: each subsystem is a directory of raw manifests with a `kustomization.ya
 - The public gateway gates which namespaces can attach routes by matching the `expose-public: "true"` label on the namespace.
 - L2 announcement is opt-in via the `lb-announce: "true"` label on the LoadBalancer Service (set on the internal gateway, not the public one).
 - **Redirect-only HTTPRoutes** are possible without any backend Service — see `network/gateway/pfsense-redirect.yaml` for `pfsense.internal.tylerrosnett.com` → 302 to `https://192.168.1.1` via Gateway API's `RequestRedirect` filter.
+
+## Remote access (Tailscale)
+
+The Tailscale operator (`network/tailscale/`) runs in the `tailscale` namespace and is authenticated via an OAuth client (SOPS-encrypted secret `operator-oauth`). Two `Connector` CRs (`network/tailscale-connectors/`) each spawn a subnet-router pod that advertises `192.168.1.0/24` — HA pair: lose one, the other carries traffic.
+
+Operator + CR resources are split into two Flux Kustomizations because the Connector CRDs are installed by the operator's Helm chart; the CRs can't be applied until the CRDs exist. `tailscale-connectors` `dependsOn: tailscale` enforces the ordering.
+
+The `tailscale` namespace carries `pod-security.kubernetes.io/enforce: privileged` — subnet-router pods need privileged containers (sysctls + raw networking).
+
+Split DNS is configured in Tailscale admin (https://login.tailscale.com/admin/dns) → custom nameserver `192.168.1.1` restricted to `internal.tylerrosnett.com`. Clients with `--accept-routes` (Mac/iOS toggle "Use Tailscale Subnets") get LAN access + correct DNS for internal hostnames from anywhere.
+
+Tag `tag:homelab` is auto-applied to managed devices; the corresponding `tagOwners` entry is required in the Tailscale ACL.
 
 ## Adding a new app
 
