@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - flux-system
   - system/kubelet-csr-approver
+  - system/cluster-admin-oidc
   - network/gateway-api.yaml
   - network/cilium.yaml
   - network/cilium-loadbalancer.yaml

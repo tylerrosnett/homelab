@@ -1,0 +1,21 @@
+cluster:
+    apiServer:
+        extraArgs:
+            oidc-issuer-url: ENC[AES256_GCM,data:gUCIUZhdGWxAxDTvLaOQaaGmLewM/QcyjXgxyi/GBBVzAQpElGLKuwKHmZXaogOZrauCik8ZoxGBk96EaUVzAHVSmVLoQI3fLn78FarVergTnLPlQ45Wh4ZXY+gaEAwISl4jTEYfZVpz0AR5/rYEhoClvmyTXZ5z0NRHdZZbMPVggA==,iv:CivW4p2VMyqQ9QdYuz2OqqVOiYKz4FIOvlhfkfuQtGY=,tag:zELewIjrP6gryOb3paPVCg==,type:str]
+            oidc-client-id: ENC[AES256_GCM,data:RyjaopvgTUTj4PeeVM8u1x56pNQZm5WSox4FHwaCbPRkQV9XHQMqV1sf0HHZWEb+fRKl02XtYs2rZBpIeyxxdA==,iv:51s2/oIZmYB553U+rK/d21qXW72YR1VefSYtY7demHs=,tag:EGdwkzNbCx7nCJFU6/sxeg==,type:str]
+            oidc-username-claim: ENC[AES256_GCM,data:SgwmoSw=,iv:jKaETtUESAS4E92SZEQX83ym85zoSZZwvc5xkHR7IN8=,tag:kDX9Tu1B8xDv5gcwrYaoKw==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuZmtFbFJDZWhMdEtaUkNr
+            U2s0YkltNElqTjhwTnpnQnh4SktpdU1JVUhzCmRoa09OSnhHUDQ4QzVlMUdRK3pt
+            b0FqYzdLbDNJcHY0OWpVWkRXS29oUVUKLS0tICtvNThFemh0aDRlUzM4dEM3RDBB
+            NWorTFMzbFhzQXVHdGNac2dMbTdCd00Ka+YoTffkrVXQfM1L2iKnFI5l0Mmi64Tw
+            YxgRmnTgnz5r9IuWBZQZVi97RyG/AHHhYiw0kctaI74NaOHxER8nfg==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1seegwzyg0ldnm2jerlpsyzkcrqctytqthwdpf0h9fs20w4nngqlqsvpaa0
+    lastmodified: "2026-05-19T02:38:34Z"
+    mac: ENC[AES256_GCM,data:ulNZ7d+aXeX8V2/jR1CtaFP5JF7f6CR0a6OKuiByoeptHsMKrws6JSgQrwmUyAt3bQuHvW0GcWXsVM1FFcgRYYysCv9atVcI2OFQUmVDxVxe2+qtlmQruJ1F6BHR656+yiRhnXcG8ZzOJmaWnpVX3HyLzqevjbfq3sQEEe2KJz8=,iv:aiAGjzkYlxPUg/sRGJaLXUWEoR3ruuOcqQQkqslGlpQ=,tag:+9dfzBh3LLQ4sFSOc1x94w==,type:str]
+    unencrypted_suffix: _unencrypted
+    version: 3.13.1

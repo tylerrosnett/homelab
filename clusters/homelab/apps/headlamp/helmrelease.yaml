@@ -42,5 +42,5 @@ spec:
       enabled: false
     config:
       oidc:
-        scopes: openid email profile groups
+        scopes: openid email profile groups offline_access
         callbackURL: https://headlamp.internal.tylerrosnett.com/oidc-callback
