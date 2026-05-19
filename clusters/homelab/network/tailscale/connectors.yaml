@@ -1,0 +1,23 @@
+apiVersion: tailscale.com/v1alpha1
+kind: Connector
+metadata:
+  name: subnet-router-a
+spec:
+  hostname: homelab-router-a
+  tags:
+    - tag:homelab
+  subnetRouter:
+    advertiseRoutes:
+      - "192.168.1.0/24"
+---
+apiVersion: tailscale.com/v1alpha1
+kind: Connector
+metadata:
+  name: subnet-router-b
+spec:
+  hostname: homelab-router-b
+  tags:
+    - tag:homelab
+  subnetRouter:
+    advertiseRoutes:
+      - "192.168.1.0/24"
