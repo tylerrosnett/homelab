@@ -112,7 +112,7 @@ The cluster trusts a single Cloudflare Access SaaS OIDC application for all inte
 
 **CF Access SaaS OIDC gotchas** (don't re-derive these):
 - **PKCE is required** by CF for SaaS apps. Headlamp values must set `config.oidc.usePKCE: true`; kubelogin must pass `--oidc-pkce-method=S256`. Without it CF rejects with `code_challenge is required for this client`.
-- **No refresh tokens.** The `offline_access` scope causes CF to return `invalid_scope`. Sessions die at the configured CF Access app session TTL (24h max). Don't request `offline_access`.
+- **Refresh tokens require explicit opt-in** on the CF Access SaaS app (toggle in the app's OIDC settings). Once enabled, request `offline_access` scope from clients (Headlamp `scopes: ... offline_access`, kubelogin `--oidc-extra-scope=offline_access`). With it on, sessions silently refresh; without it, you re-auth at every access-token expiry (~10 min default).
 - **Custom claims on SaaS apps can only map IdP attributes**, not literal strings or Rule Group references. So you can't synthesize a `groups` claim with `homelab-admins` from CF alone — needs to come from a GitHub team or Google Workspace group. For single-user homelab, just bind by email and SOPS-encrypt the CRB.
 - **Identity endpoint** for debugging claims: `https://tylerrosnett.cloudflareaccess.com/cdn-cgi/access/get-identity` (after logging in to any CF Access app). Returns session-level claims as JSON. Force re-auth via `https://tylerrosnett.cloudflareaccess.com/cdn-cgi/access/logout`.
 

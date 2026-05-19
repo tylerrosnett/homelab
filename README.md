@@ -114,7 +114,7 @@ The cluster trusts **Cloudflare Access SaaS OIDC** as an identity provider end-t
 
 **CF Access SaaS OIDC quirks** that took a while to debug:
 - **PKCE is required**. Both Headlamp (`usePKCE: true`) and kubelogin (`--oidc-pkce-method=S256`) must opt in. CF rejects with `code_challenge is required for this client` otherwise.
-- **Refresh tokens are NOT issued**. The `offline_access` scope causes `invalid_scope` errors. Sessions die at the configured session TTL (extend via Application → Session duration up to 24h).
+- **Refresh tokens require explicit opt-in** on the SaaS app (toggle in OIDC settings). Once enabled, request `offline_access` scope so sessions silently refresh. Without it, clients re-auth on every access-token expiry (~10 min).
 - **Group claims need an IdP source** (e.g. GitHub teams). Custom claims on the SaaS app can only map IdP attributes, not literal strings or Rule Groups. Email-based RBAC is the practical fallback for single-user homelabs.
 
 ## Secrets
