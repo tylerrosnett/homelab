@@ -5,4 +5,3 @@ resources:
   - repository.yaml
   - secrets/operator-oauth.sops.yaml
   - helmrelease.yaml
-  - connectors.yaml
