@@ -1,0 +1,75 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":gitSignOff",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "America/Los_Angeles",
+  "schedule": ["after 6pm on weekdays", "every weekend"],
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 10,
+  "labels": ["dependencies"],
+  "flux": {
+    "fileMatch": ["(^|/)clusters/.+\\.ya?ml$"]
+  },
+  "helm-values": {
+    "fileMatch": ["(^|/)clusters/.+\\.ya?ml$"]
+  },
+  "kubernetes": {
+    "fileMatch": ["(^|/)clusters/.+\\.ya?ml$", "(^|/)talos/.+\\.ya?ml$"]
+  },
+  "kustomize": {
+    "fileMatch": ["(^|/)kustomization\\.ya?ml$"]
+  },
+  "packageRules": [
+    {
+      "description": "Group all kube-prometheus-stack updates",
+      "matchPackageNames": ["kube-prometheus-stack"],
+      "groupName": "kube-prometheus-stack"
+    },
+    {
+      "description": "Group Loki + Alloy (both Grafana, often released together)",
+      "matchPackageNames": ["loki", "alloy"],
+      "groupName": "grafana-logs-stack"
+    },
+    {
+      "description": "Group Cilium chart + image",
+      "matchPackageNames": ["cilium", "quay.io/cilium/cilium"],
+      "groupName": "cilium"
+    },
+    {
+      "description": "Auto-merge patch updates of well-known charts (still opens PR for review)",
+      "matchUpdateTypes": ["patch"],
+      "matchPackageNames": ["cert-manager", "external-dns", "longhorn"],
+      "automerge": false
+    },
+    {
+      "description": "Talos version bumps need manual review + per-node rollout",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/siderolabs/installer"],
+      "labels": ["dependencies", "talos", "manual-rollout-required"],
+      "groupName": "talos"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Talos version in talconfig.yaml",
+      "fileMatch": ["^talos/talconfig\\.ya?ml$"],
+      "matchStrings": ["talosVersion:\\s*(?<currentValue>v\\S+)"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "siderolabs/talos"
+    },
+    {
+      "customType": "regex",
+      "description": "Kubernetes version in talconfig.yaml",
+      "fileMatch": ["^talos/talconfig\\.ya?ml$"],
+      "matchStrings": ["kubernetesVersion:\\s*(?<currentValue>v\\S+)"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "kubernetes/kubernetes"
+    }
+  ]
+}
