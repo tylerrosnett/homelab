@@ -18,4 +18,4 @@ spec:
   healthChecks:
     - apiVersion: pkg.crossplane.io/v1
       kind: Provider
-      name: provider-cloudflare-dns
+      name: provider-cloudflare
