@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - flux-instance.yaml
   - flux-operator.yaml
+  - httproute.yaml
 configMapGenerator:
   - name: flux-operator-values
     namespace: flux-system
