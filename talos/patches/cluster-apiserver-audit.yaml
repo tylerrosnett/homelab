@@ -1,0 +1,49 @@
+cluster:
+  apiServer:
+    extraArgs:
+      audit-log-path: /var/log/audit/kube/kube-apiserver-audit.log
+      audit-log-maxage: "30"
+      audit-log-maxbackup: "10"
+      audit-log-maxsize: "100"
+    auditPolicy:
+      apiVersion: audit.k8s.io/v1
+      kind: Policy
+      omitStages:
+        - RequestReceived
+      rules:
+        # Drop noisy health/version/discovery endpoints
+        - level: None
+          nonResourceURLs:
+            - /healthz*
+            - /livez*
+            - /readyz*
+            - /version
+            - /openapi*
+            - /api*
+            - /apis*
+            - /metrics
+
+        # Drop high-volume leader-election lease churn
+        - level: None
+          resources:
+            - group: coordination.k8s.io
+              resources: ["leases"]
+
+        # Drop authenticated system service-account reads (noisy controllers)
+        - level: None
+          userGroups: ["system:serviceaccounts", "system:nodes"]
+          verbs: ["get", "list", "watch"]
+
+        # Full request+response payloads for security-sensitive mutations
+        - level: RequestResponse
+          verbs: ["create", "update", "patch", "delete", "deletecollection"]
+          resources:
+            - group: ""
+              resources: ["secrets", "configmaps", "serviceaccounts"]
+            - group: "rbac.authorization.k8s.io"
+              resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+            - group: "policy"
+              resources: ["podsecuritypolicies"]
+
+        # Metadata for everything else (covers who did what to what)
+        - level: Metadata

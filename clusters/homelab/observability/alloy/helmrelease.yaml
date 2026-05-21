@@ -22,7 +22,18 @@ spec:
   values:
     controller:
       type: daemonset
+      volumes:
+        extra:
+          - name: audit-logs
+            hostPath:
+              path: /var/log/audit/kube
+              type: DirectoryOrCreate
     alloy:
+      mounts:
+        extra:
+          - name: audit-logs
+            mountPath: /var/log/audit/kube
+            readOnly: true
       configMap:
         create: true
         content: |
@@ -59,4 +70,41 @@ spec:
           loki.source.kubernetes "pods" {
             targets    = discovery.relabel.pods.output
             forward_to = [loki.write.default.receiver]
+          }
+
+          local.file_match "audit" {
+            path_targets = [{
+              __path__ = "/var/log/audit/kube/kube-apiserver-audit*.log",
+              job      = "kube-apiserver-audit",
+              node     = sys.env("HOSTNAME"),
+            }]
+          }
+
+          loki.source.file "audit" {
+            targets    = local.file_match.audit.targets
+            forward_to = [loki.process.audit.receiver]
+          }
+
+          loki.process "audit" {
+            forward_to = [loki.write.default.receiver]
+            stage.json {
+              expressions = {
+                verb        = "verb",
+                user        = "user.username",
+                resource    = "objectRef.resource",
+                namespace   = "objectRef.namespace",
+                stage       = "stage",
+                code        = "responseStatus.code",
+              }
+            }
+            stage.labels {
+              values = {
+                verb      = "",
+                user      = "",
+                resource  = "",
+                namespace = "",
+                stage     = "",
+                code      = "",
+              }
+            }
           }

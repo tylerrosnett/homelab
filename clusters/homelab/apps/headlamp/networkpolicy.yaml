@@ -1,0 +1,14 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: headlamp-ingress
+  namespace: headlamp
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: headlamp
+  ingress:
+    - fromEntities:
+        - ingress
+        - host
+        - remote-node
