@@ -1,0 +1,18 @@
+apiVersion: dns.upjet-cloudflare.m.upbound.io/v1alpha1
+kind: Record
+metadata:
+  name: wildcard-tylerrosnett
+  namespace: cloudflare
+  annotations:
+    crossplane.io/external-name: 4b9f5485af2db5cb89263fe0c8388001
+spec:
+  forProvider:
+    zoneId: 44d494598f8397dcf5b600cc3c41455c
+    name: "*"
+    type: CNAME
+    content: 705038a6-3c96-4250-97c6-b0ad6439f62e.cfargotunnel.com
+    ttl: 1
+    proxied: true
+  providerConfigRef:
+    kind: ClusterProviderConfig
+    name: default
