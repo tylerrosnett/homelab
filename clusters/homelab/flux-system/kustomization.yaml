@@ -4,6 +4,7 @@ resources:
   - flux-instance.yaml
   - flux-operator.yaml
   - httproute.yaml
+  - networkpolicy.yaml
 configMapGenerator:
   - name: flux-operator-values
     namespace: flux-system
