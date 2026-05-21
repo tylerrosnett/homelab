@@ -19,3 +19,12 @@ spec:
     - apiVersion: pkg.crossplane.io/v1
       kind: Provider
       name: provider-cloudflare-dns
+    - apiVersion: pkg.crossplane.io/v1
+      kind: Provider
+      name: provider-cloudflare-zone
+    - apiVersion: pkg.crossplane.io/v1
+      kind: Provider
+      name: provider-cloudflare-access
+    - apiVersion: pkg.crossplane.io/v1
+      kind: Provider
+      name: provider-cloudflare-zero

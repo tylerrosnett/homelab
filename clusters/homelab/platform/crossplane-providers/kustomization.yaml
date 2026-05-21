@@ -2,3 +2,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - provider-cloudflare-dns.yaml
+  - provider-cloudflare-zone.yaml
+  - provider-cloudflare-access.yaml
+  - provider-cloudflare-zero.yaml
