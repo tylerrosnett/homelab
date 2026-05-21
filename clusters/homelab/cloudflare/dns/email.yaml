@@ -108,7 +108,7 @@ spec:
     zoneId: 44d494598f8397dcf5b600cc3c41455c
     name: "@"
     type: TXT
-    content: "v=spf1 include:_spf.protonmail.ch ~all"
+    content: '"v=spf1 include:_spf.protonmail.ch ~all"'
     comment: "SPF — authorize Proton to send mail for the domain"
     ttl: 1
     proxied: false
@@ -128,7 +128,7 @@ spec:
     zoneId: 44d494598f8397dcf5b600cc3c41455c
     name: _dmarc
     type: TXT
-    content: "v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s;"
+    content: '"v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s;"'
     comment: "DMARC strict reject — anti-spoofing for tylerrosnett.com"
     ttl: 1
     proxied: false
@@ -148,7 +148,7 @@ spec:
     zoneId: 44d494598f8397dcf5b600cc3c41455c
     name: "*._domainkey"
     type: TXT
-    content: "v=DKIM1; p="
+    content: '"v=DKIM1; p="'
     comment: "Wildcard null DKIM — explicit fail for any selector not protonmail{,2,3}"
     ttl: 1
     proxied: false
@@ -168,7 +168,7 @@ spec:
     zoneId: 44d494598f8397dcf5b600cc3c41455c
     name: "@"
     type: TXT
-    content: "protonmail-verification=e7ce0bdfb89b9a3a2c64769683ef3c7d95b30220"
+    content: '"protonmail-verification=e7ce0bdfb89b9a3a2c64769683ef3c7d95b30220"'
     comment: "Proton domain ownership verification"
     ttl: 1
     proxied: false
