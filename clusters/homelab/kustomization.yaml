@@ -4,6 +4,9 @@ resources:
   - flux-system
   - system/kubelet-csr-approver
   - system/cluster-admin-oidc
+  - platform/crossplane.yaml
+  - platform/crossplane-providers.yaml
+  - platform/crossplane-provider-config.yaml
   - network/gateway-api.yaml
   - network/cilium.yaml
   - network/cilium-loadbalancer.yaml
