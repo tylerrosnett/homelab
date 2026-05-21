@@ -1,0 +1,177 @@
+---
+apiVersion: dns.upjet-cloudflare.m.upbound.io/v1alpha1
+kind: Record
+metadata:
+  name: proton-mx-primary
+  namespace: cloudflare
+  annotations:
+    crossplane.io/external-name: b405cd1e21cb2c47d9ce2852b6657d78
+spec:
+  forProvider:
+    zoneId: 44d494598f8397dcf5b600cc3c41455c
+    name: "@"
+    type: MX
+    content: mail.protonmail.ch
+    priority: 10
+    ttl: 1
+    proxied: false
+  providerConfigRef:
+    kind: ClusterProviderConfig
+    name: default
+---
+apiVersion: dns.upjet-cloudflare.m.upbound.io/v1alpha1
+kind: Record
+metadata:
+  name: proton-mx-secondary
+  namespace: cloudflare
+  annotations:
+    crossplane.io/external-name: 990f5511f6e59e1ec2cd1608995b9e11
+spec:
+  forProvider:
+    zoneId: 44d494598f8397dcf5b600cc3c41455c
+    name: "@"
+    type: MX
+    content: mailsec.protonmail.ch
+    priority: 20
+    ttl: 1
+    proxied: false
+  providerConfigRef:
+    kind: ClusterProviderConfig
+    name: default
+---
+apiVersion: dns.upjet-cloudflare.m.upbound.io/v1alpha1
+kind: Record
+metadata:
+  name: proton-dkim-1
+  namespace: cloudflare
+  annotations:
+    crossplane.io/external-name: 357c532fce887882ae966e08745ee307
+spec:
+  forProvider:
+    zoneId: 44d494598f8397dcf5b600cc3c41455c
+    name: protonmail._domainkey
+    type: CNAME
+    content: protonmail.domainkey.dowhakva4h3utg2kfhm36fsuxgdsk77zmv6canv5vo7glrkr5udhq.domains.proton.ch
+    ttl: 1
+    proxied: false
+  providerConfigRef:
+    kind: ClusterProviderConfig
+    name: default
+---
+apiVersion: dns.upjet-cloudflare.m.upbound.io/v1alpha1
+kind: Record
+metadata:
+  name: proton-dkim-2
+  namespace: cloudflare
+  annotations:
+    crossplane.io/external-name: 74aebf33d93a2eb26b87ae51b1ff52e0
+spec:
+  forProvider:
+    zoneId: 44d494598f8397dcf5b600cc3c41455c
+    name: protonmail2._domainkey
+    type: CNAME
+    content: protonmail2.domainkey.dowhakva4h3utg2kfhm36fsuxgdsk77zmv6canv5vo7glrkr5udhq.domains.proton.ch
+    ttl: 1
+    proxied: false
+  providerConfigRef:
+    kind: ClusterProviderConfig
+    name: default
+---
+apiVersion: dns.upjet-cloudflare.m.upbound.io/v1alpha1
+kind: Record
+metadata:
+  name: proton-dkim-3
+  namespace: cloudflare
+  annotations:
+    crossplane.io/external-name: bf532f0cfed21fbc3997fc7a76433d3e
+spec:
+  forProvider:
+    zoneId: 44d494598f8397dcf5b600cc3c41455c
+    name: protonmail3._domainkey
+    type: CNAME
+    content: protonmail3.domainkey.dowhakva4h3utg2kfhm36fsuxgdsk77zmv6canv5vo7glrkr5udhq.domains.proton.ch
+    ttl: 1
+    proxied: false
+  providerConfigRef:
+    kind: ClusterProviderConfig
+    name: default
+---
+apiVersion: dns.upjet-cloudflare.m.upbound.io/v1alpha1
+kind: Record
+metadata:
+  name: spf
+  namespace: cloudflare
+  annotations:
+    crossplane.io/external-name: fb99c7e3968018ba7d4fefe9d2ce4a49
+spec:
+  forProvider:
+    zoneId: 44d494598f8397dcf5b600cc3c41455c
+    name: "@"
+    type: TXT
+    content: "v=spf1 include:_spf.protonmail.ch ~all"
+    comment: "SPF — authorize Proton to send mail for the domain"
+    ttl: 1
+    proxied: false
+  providerConfigRef:
+    kind: ClusterProviderConfig
+    name: default
+---
+apiVersion: dns.upjet-cloudflare.m.upbound.io/v1alpha1
+kind: Record
+metadata:
+  name: dmarc
+  namespace: cloudflare
+  annotations:
+    crossplane.io/external-name: b688a6dc63b98fc57b11a17eb78d3b54
+spec:
+  forProvider:
+    zoneId: 44d494598f8397dcf5b600cc3c41455c
+    name: _dmarc
+    type: TXT
+    content: "v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s;"
+    comment: "DMARC strict reject — anti-spoofing for tylerrosnett.com"
+    ttl: 1
+    proxied: false
+  providerConfigRef:
+    kind: ClusterProviderConfig
+    name: default
+---
+apiVersion: dns.upjet-cloudflare.m.upbound.io/v1alpha1
+kind: Record
+metadata:
+  name: dkim-null-wildcard
+  namespace: cloudflare
+  annotations:
+    crossplane.io/external-name: b0a696ed8ffdeb20cf45f06b4cfd8a28
+spec:
+  forProvider:
+    zoneId: 44d494598f8397dcf5b600cc3c41455c
+    name: "*._domainkey"
+    type: TXT
+    content: "v=DKIM1; p="
+    comment: "Wildcard null DKIM — explicit fail for any selector not protonmail{,2,3}"
+    ttl: 1
+    proxied: false
+  providerConfigRef:
+    kind: ClusterProviderConfig
+    name: default
+---
+apiVersion: dns.upjet-cloudflare.m.upbound.io/v1alpha1
+kind: Record
+metadata:
+  name: proton-verification
+  namespace: cloudflare
+  annotations:
+    crossplane.io/external-name: 5f027783ef2bbb99fdbaa4020f5a9e41
+spec:
+  forProvider:
+    zoneId: 44d494598f8397dcf5b600cc3c41455c
+    name: "@"
+    type: TXT
+    content: "protonmail-verification=e7ce0bdfb89b9a3a2c64769683ef3c7d95b30220"
+    comment: "Proton domain ownership verification"
+    ttl: 1
+    proxied: false
+  providerConfigRef:
+    kind: ClusterProviderConfig
+    name: default
