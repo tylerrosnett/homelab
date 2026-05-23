@@ -1,6 +1,10 @@
 # homelab
 
-GitOps configuration for a 3-node [Talos Linux](https://www.talos.dev/) Kubernetes cluster, reconciled by [Flux](https://fluxcd.io/). Public apps are exposed via Cloudflare Tunnel; internal apps stay on the LAN with their own TLS.
+A 3-node Kubernetes cluster running on second-hand Lenovo ThinkCentre thin clients.
+
+Everything is GitOps. Everything is declarative. The repo is the cluster — node OS config, networking, storage, observability, auth, and workloads all live here as code and are reconciled automatically. There is no `kubectl apply` step in any normal workflow; a merge to `main` is the deploy.
+
+The stack: [Talos Linux](https://www.talos.dev/) for the OS (immutable, API-driven, no SSH), [Flux](https://fluxcd.io/) for cluster reconciliation, [Cilium](https://cilium.io/) for networking and Gateway API, [Longhorn](https://longhorn.io/) for storage, [cert-manager](https://cert-manager.io/) + Let's Encrypt for TLS, and [Cloudflare](https://www.cloudflare.com/) for public ingress (Tunnel), DNS, and SSO (Access OIDC). Public apps reach the internet via Cloudflare Tunnel; internal apps stay on the LAN behind a wildcard TLS cert; remote access goes through a Tailscale subnet router.
 
 ## Cluster
 
