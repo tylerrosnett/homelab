@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: home-assistant
+  namespace: home-assistant
+spec:
+  replicas: 0
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: home-assistant
+  template:
+    metadata:
+      labels:
+        app: home-assistant
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: home-assistant
+          image: ghcr.io/home-assistant/home-assistant:stable
+          ports:
+            - name: http
+              containerPort: 8123
+          env:
+            - name: TZ
+              value: America/Los_Angeles
+          volumeMounts:
+            - name: config
+              mountPath: /config
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8123
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8123
+            initialDelaySeconds: 120
+            periodSeconds: 30
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: home-assistant-config
