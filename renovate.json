@@ -12,6 +12,7 @@
   "prHourlyLimit": 4,
   "prConcurrentLimit": 10,
   "labels": ["dependencies"],
+  "assignees": ["tylerrosnett"],
   "flux": {
     "fileMatch": ["(^|/)clusters/.+\\.ya?ml$"]
   },
