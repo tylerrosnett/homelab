@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blocky-config
+  namespace: blocky
+data:
+  config.yml: |
+    upstreams:
+      groups:
+        default:
+          - tcp-tls:1.1.1.1:853
+          - tcp-tls:1.0.0.1:853
+      strategy: parallel_best
+      timeout: 2s
+
+    blocking:
+      denylists:
+        ads:
+          - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+          - https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/pro.txt
+      allowlists:
+        ads:
+          - |
+            # Custom allowlist — add domains here to un-block false positives.
+      clientGroupsBlock:
+        default:
+          - ads
+      blockType: zeroIp
+      loading:
+        refreshPeriod: 4h
+        strategy: blocking
+        downloads:
+          timeout: 60s
+          attempts: 3
+
+    caching:
+      prefetching: true
+      prefetchExpires: 2h
+      prefetchThreshold: 5
+
+    prometheus:
+      enable: true
+      path: /metrics
+
+    queryLog:
+      type: none
+
+    ports:
+      dns: 53
+      http: 4000
+
+    log:
+      level: info
+      format: text

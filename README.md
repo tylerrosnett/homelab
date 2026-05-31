@@ -18,6 +18,7 @@ The stack: [Talos Linux](https://www.talos.dev/) for the OS (immutable, API-driv
 | Storage | Longhorn 1.11.2 (3 replicas, default StorageClass) |
 | Certs | cert-manager + Let's Encrypt (DNS01 via Cloudflare) |
 | DNS | ExternalDNS → Cloudflare (internal hostnames only) |
+| Ad-blocking | Blocky — LAN-wide DNS sinkhole at `192.168.1.202`; pfSense forwards all queries to it |
 | Ingress | Cilium Gateway API — internal gateway on LAN, public gateway behind cloudflared |
 | Observability | kube-prometheus-stack 85.1.3, Loki 7.0.0 single-binary, Grafana Alloy 1.8.1 DaemonSet, Hubble UI |
 | Uptime monitoring | blackbox-exporter probes 8 endpoints; alerts → Discord via Alertmanager `discord_configs` |
@@ -50,11 +51,11 @@ clusters/homelab/
     alloy/                          Grafana Alloy DaemonSet (logs → Loki)
     flux-monitoring/                Flux PodMonitor + dashboards (ConfigMaps)
     blackbox-exporter/              Blackbox probes, alert rules, Discord AlertmanagerConfig
-    extra-dashboards/               cert-manager / Cilium / Longhorn / Node Exporter / Loki / Blackbox dashboards
+    extra-dashboards/               cert-manager / Cilium / Longhorn / Node Exporter / Loki / Blackbox / Blocky dashboards
   system/
     kubelet-csr-approver/           Auto-approves kubelet serving CSRs
     cluster-admin-oidc/             ClusterRoleBinding (SOPS) binding CF Access user → cluster-admin
-  apps/                             Workloads (whoami, hello-public, game-2048, headlamp, ...)
+  apps/                             Workloads (whoami, hello-public, game-2048, headlamp, home-assistant, blocky, ...)
 docs/                               Local notes; not deployed
 renovate.json                       Renovate config (managed by Mend's hosted GitHub App)
 ```
@@ -80,6 +81,18 @@ The `tailscale` namespace carries `pod-security.kubernetes.io/enforce: privilege
 Split DNS is configured in Tailscale admin (https://login.tailscale.com/admin/dns) → custom nameserver `192.168.1.1` restricted to `internal.tylerrosnett.com`. Clients with `--accept-routes` (Mac/iOS toggle "Use Tailscale Subnets") get LAN access + correct DNS for internal hostnames from anywhere.
 
 Tag `tag:homelab` is auto-applied to managed devices; the corresponding `tagOwners` entry is required in the Tailscale ACL.
+
+## DNS ad-blocking (Blocky)
+
+[Blocky](https://github.com/0xERR0R/blocky) (`apps/blocky/`) is a LAN-wide DNS ad/tracker blocker. pfSense Unbound (`192.168.1.1`) stays the resolver every client talks to and **forwards** all queries to Blocky, which filters against blocklists and forwards clean lookups upstream to Cloudflare over DoT. Clients are untouched (DHCP still hands out pfSense); disabling Unbound's forwarding mode is an instant rollback.
+
+- 2 replicas with pod anti-affinity. DNS is served on a `LoadBalancer` Service at `192.168.1.202` (L2-announced via the `lb-announce` label), ports 53 UDP+TCP, `externalTrafficPolicy: Local`. The HTTP/metrics port is a separate ClusterIP backing a ServiceMonitor.
+- Blocklists: StevenBlack + hagezi pro, plus an inline allowlist. Query logging is disabled by choice — only aggregate Prometheus metrics (block rate, query totals, cache hits) are kept, surfaced via Grafana dashboard #13768.
+- Namespace PSA is `restricted` (Blocky runs non-root and only needs `NET_BIND_SERVICE` to bind `:53`).
+
+pfSense forwarding-mode gotchas: DNSSEC validation must be **off** (Blocky's synthetic `0.0.0.0` answers for blocked domains fail validation → SERVFAIL on blocked names only), the `private-domain` custom option needs a `server:` prefix to survive forwarding mode, "Use SSL/TLS for outgoing queries" must stay off (Blocky is plain DNS on `:53`), and Blocky must be the sole upstream (forwarding mode races all listed servers). Split-DNS host overrides for `*.internal.tylerrosnett.com` still resolve locally before any forward.
+
+Note: DNS blocking only stops third-party ad/tracker domains — first-party in-app ads (Pinterest, YouTube, Instagram) come down the same domains as the content and aren't blockable this way.
 
 ## Adding a new app
 
@@ -129,7 +142,7 @@ Internal UIs exposed via `*.internal.tylerrosnett.com`: `longhorn`, `prometheus`
 
 Prometheus and Alertmanager both have `externalUrl` set to their `*.internal.tylerrosnett.com` hostnames so "Source" links in Alertmanager and links in Discord notifications resolve from a browser (otherwise they'd point at cluster-internal service DNS).
 
-**Extra dashboards** (`observability/extra-dashboards/`): cert-manager, Cilium Agent, Longhorn, Node Exporter Full (grafana.com #1860), Loki, Blackbox Exporter. Loaded the same way as Flux dashboards — kustomize `configMapGenerator` with `grafana_dashboard: "1"` label.
+**Extra dashboards** (`observability/extra-dashboards/`): cert-manager, Cilium Agent, Longhorn, Node Exporter Full (grafana.com #1860), Loki, Blackbox Exporter, Blocky (grafana.com #13768). Loaded the same way as Flux dashboards — kustomize `configMapGenerator` with `grafana_dashboard: "1"` label.
 
 ## Uptime monitoring and alerts
 
