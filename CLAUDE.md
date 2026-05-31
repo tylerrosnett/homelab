@@ -135,6 +135,22 @@ When adding a new app that should be behind CF Access (rather than just LAN-only
 
 **Pattern for any operator with CRDs + CRs in this repo:** split into two Flux Kustomizations (operator-installs-CRDs first, CRs second with `dependsOn`). Don't put both in one kustomize bundle — Flux dry-run validation fails on the CRs before the CRDs land.
 
+## Blocky DNS ad-blocking
+
+`apps/blocky/` runs [Blocky](https://github.com/0xERR0R/blocky) as a LAN-wide DNS ad/tracker blocker. **Model A**: pfSense Unbound (192.168.1.1) stays the client-facing resolver and *forwards* upstream to Blocky; Blocky filters and forwards clean queries to Cloudflare DoT. Clients are unchanged (still use pfSense via DHCP); rollback = disable Unbound Forwarding Mode.
+
+- Raw manifests (no first-party Helm chart). Config is a ConfigMap (`config.yml`); `queryLog.type: none` (no per-request logging by choice — aggregate Prometheus metrics only). Upstreams are Cloudflare DoT (`tcp-tls:1.1.1.1:853` / `1.0.0.1:853`). Denylists: StevenBlack + hagezi pro, with an inline allowlist for false positives.
+- **2 replicas** with `requiredDuringScheduling` pod anti-affinity (DNS shouldn't flap on a node reboot). Namespace PSA is **`restricted`** — Blocky runs non-root and only needs `NET_BIND_SERVICE` (the one cap `restricted` permits) to bind :53.
+- **DNS Service** is `LoadBalancer` at `192.168.1.202` (`lb-announce: "true"` for L2 announce), ports 53/UDP+TCP, `externalTrafficPolicy: Local`. Separate ClusterIP `blocky-metrics:4000` backs the ServiceMonitor (`release: kube-prometheus-stack`). No gateway HTTPRoute — Blocky has no web UI.
+- Because of Model A, all queries reach Blocky from pfSense's IP, so there is no per-client granularity in metrics (consistent with the no-logging choice).
+
+**pfSense forwarding-mode gotchas (don't re-derive):**
+- **DNSSEC must be OFF.** Services → DNS Resolver → uncheck "Enable DNSSEC Support". Blocky returns synthetic `0.0.0.0` for blocked domains; Unbound with DNSSEC validation marks that bogus → **SERVFAIL on blocked domains only** (clean domains still resolve). This is the signature symptom. Encryption/validation still happens upstream at Blocky→Cloudflare DoT.
+- **`private-domain` custom option needs an explicit `server:` prefix.** pfSense appends Custom Options at the end of `unbound.conf`; once Forwarding Mode injects a `forward-zone:` block, a bare `private-domain: "tylerrosnett.com"` lands in forward-zone context and Unbound rejects it (`syntax error`). Prefix the Custom Options block with `server:` to re-enter server context.
+- **"Use SSL/TLS for outgoing queries" must stay OFF** — Blocky listens plain DNS on :53, not DoT on :853.
+- Blocky must be the **only** DNS server in System → General; in forwarding mode Unbound races all listed servers, so a leftover `1.1.1.1` lets queries bypass the blocker. Also uncheck the WAN DNS override.
+- Split-DNS host overrides (`*.internal.tylerrosnett.com`) still win — Unbound answers them locally before forwarding, so Blocky never sees them.
+
 ## Uptime monitoring and Discord alerts
 
 `observability/blackbox-exporter/` owns the uptime side end-to-end:
