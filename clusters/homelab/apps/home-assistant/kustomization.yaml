@@ -6,3 +6,5 @@ resources:
   - deployment.yaml
   - service.yaml
   - httproute.yaml
+  - servicemonitor.yaml
+  - secrets/prometheus-token.sops.yaml
