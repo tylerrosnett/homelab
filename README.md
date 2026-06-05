@@ -22,6 +22,7 @@ The stack: [Talos Linux](https://www.talos.dev/) for the OS (immutable, API-driv
 | Ingress | Cilium Gateway API — internal gateway on LAN, public gateway behind cloudflared |
 | Observability | kube-prometheus-stack 85.1.3, Loki 7.0.0 single-binary, Grafana Alloy 1.8.1 DaemonSet, Hubble UI |
 | Uptime monitoring | blackbox-exporter probes 8 endpoints; alerts → Discord via Alertmanager `discord_configs` |
+| Energy monitoring | Shelly Plug US Gen4 per-node smart plugs → Home Assistant → Prometheus → Grafana |
 | Auth | Cloudflare Access SaaS OIDC → kube-apiserver, Headlamp, and kubectl (via kubelogin) |
 | Remote access | Tailscale operator with 2 HA subnet routers advertising `192.168.1.0/24` |
 | Dependency updates | Renovate (Mend-hosted) — config in `renovate.json`, opens grouped PRs nightly/weekends |
@@ -51,7 +52,7 @@ clusters/homelab/
     alloy/                          Grafana Alloy DaemonSet (logs → Loki)
     flux-monitoring/                Flux PodMonitor + dashboards (ConfigMaps)
     blackbox-exporter/              Blackbox probes, alert rules, Discord AlertmanagerConfig
-    extra-dashboards/               cert-manager / Cilium / Longhorn / Node Exporter / Loki / Blackbox / Blocky dashboards
+    extra-dashboards/               cert-manager / Cilium / Longhorn / Node Exporter / Loki / Blackbox / Blocky / Energy dashboards
   system/
     kubelet-csr-approver/           Auto-approves kubelet serving CSRs
     cluster-admin-oidc/             ClusterRoleBinding (SOPS) binding CF Access user → cluster-admin
@@ -138,11 +139,11 @@ Stack lives in the `monitoring` namespace.
 
 The `monitoring` namespace carries `pod-security.kubernetes.io/enforce: privileged` because node-exporter needs `hostNetwork`/`hostPID`. Grafana uses `Recreate` deployment strategy (RWO PVC + `RollingUpdate` deadlocks).
 
-Internal UIs exposed via `*.internal.tylerrosnett.com`: `longhorn`, `prometheus`, `alertmanager`, `headlamp`, `hubble` (Cilium flow observability — `hubble.relay.enabled` + `hubble.ui.enabled` on the Cilium HelmRelease), `pfsense` (redirect-only).
+Internal UIs exposed via `*.internal.tylerrosnett.com`: `longhorn`, `prometheus`, `alertmanager`, `headlamp`, `hubble` (Cilium flow observability — `hubble.relay.enabled` + `hubble.ui.enabled` on the Cilium HelmRelease), `ha` / `homeassistant` (Home Assistant), `pfsense` (redirect-only).
 
 Prometheus and Alertmanager both have `externalUrl` set to their `*.internal.tylerrosnett.com` hostnames so "Source" links in Alertmanager and links in Discord notifications resolve from a browser (otherwise they'd point at cluster-internal service DNS).
 
-**Extra dashboards** (`observability/extra-dashboards/`): cert-manager, Cilium Agent, Longhorn, Node Exporter Full (grafana.com #1860), Loki, Blackbox Exporter, Blocky (grafana.com #13768). Loaded the same way as Flux dashboards — kustomize `configMapGenerator` with `grafana_dashboard: "1"` label.
+**Extra dashboards** (`observability/extra-dashboards/`): cert-manager, Cilium Agent, Longhorn, Node Exporter Full (grafana.com #1860), Loki, Blackbox Exporter, Blocky (grafana.com #13768), Energy / Smart Plugs (hand-written). Loaded the same way as Flux dashboards — kustomize `configMapGenerator` with `grafana_dashboard: "1"` label.
 
 ## Uptime monitoring and alerts
 

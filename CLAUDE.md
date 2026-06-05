@@ -11,9 +11,9 @@ GitOps configuration for a 3-node Talos Linux Kubernetes homelab. Flat layout �
 - `clusters/homelab/network/` — CNI (Cilium), Gateway API CRDs, LB IP pool / L2 announce, Gateways (internal `*.ik8s` + public `*.k8s` for Cloudflare Tunnel), ExternalDNS, cloudflared, Tailscale operator + subnet-router Connectors.
 - `clusters/homelab/security/` — cert-manager + ClusterIssuers.
 - `clusters/homelab/storage/` — Longhorn (+ HTTPRoute exposing the UI internally).
-- `clusters/homelab/observability/` — kube-prometheus-stack (Prometheus, Alertmanager, Grafana), Loki single-binary, Grafana Alloy DaemonSet, Flux PodMonitor + dashboards, blackbox-exporter (uptime probes + Discord alerts), extra-dashboards (cert-manager / Cilium / Longhorn / Node Exporter Full / Loki / Blackbox JSONs as ConfigMaps).
+- `clusters/homelab/observability/` — kube-prometheus-stack (Prometheus, Alertmanager, Grafana), Loki single-binary, Grafana Alloy DaemonSet, Flux PodMonitor + dashboards, blackbox-exporter (uptime probes + Discord alerts), extra-dashboards (cert-manager / Cilium / Longhorn / Node Exporter Full / Loki / Blackbox / Blocky / Energy JSONs as ConfigMaps).
 - `clusters/homelab/system/` — cluster-level helpers (`kubelet-csr-approver`, `cluster-admin-oidc` for the SOPS-encrypted OIDC ClusterRoleBinding).
-- `clusters/homelab/apps/` — workload manifests (deployments, services, HTTPRoutes, NetworkPolicies). Includes `headlamp` (cluster-admin dashboard with CF Access OIDC).
+- `clusters/homelab/apps/` — workload manifests (deployments, services, HTTPRoutes, NetworkPolicies). Includes `headlamp` (cluster-admin dashboard with CF Access OIDC) and `home-assistant` (smart-home hub + smart-plug energy metrics source).
 - `docs/` — local notes (e.g. `docs/superpowers/plans/`); not deployed.
 - `renovate.json` — config for the Mend-hosted Renovate GitHub App. Detects HelmRelease chart versions, OCI/HTTPS HelmRepositories, kustomize images, GHA digests, plus custom regex managers for `talosVersion:` and `kubernetesVersion:` in `talconfig.yaml`. Opens PRs only after 6pm + weekends to avoid daytime noise. Renovate maintains a "Dependency Dashboard" issue tracking everything it finds.
 
@@ -103,6 +103,7 @@ DNS for public apps relies on the wildcard CNAME `*.tylerrosnett.com → <tunnel
 - Prometheus selector flips: `podMonitorSelectorNilUsesHelmValues: false` etc — so all PodMonitors/ServiceMonitors cluster-wide get picked up regardless of the `release` label. Required for Flux's PodMonitor in `flux-system` to be scraped.
 - Grafana uses `deploymentStrategy: { type: Recreate, rollingUpdate: null }`. With a RWO Longhorn PVC, the default `RollingUpdate` deadlocks (new pod waits forever for PVC). Explicitly setting `rollingUpdate: null` is required because Helm's deep-merge otherwise keeps the chart's default `maxSurge`/`maxUnavailable`, which the K8s API rejects when `type: Recreate`.
 - Dashboards are loaded via Grafana's sidecar by labeling ConfigMaps `grafana_dashboard: "1"` (KPS values set `sidecar.dashboards.searchNamespace: ALL` so the sidecar discovers from any namespace).
+- **Sidecar-provisioned dashboard JSONs must define a `DS_PROMETHEUS` datasource template variable** in `templating.list` (`type: datasource, query: prometheus, hide: 2`). Provisioning does NOT substitute the `__inputs` block, so panels referencing `${DS_PROMETHEUS}` without the variable fail with "datasource not found" on every panel. See any existing JSON in `extra-dashboards/dashboards/` for the pattern.
 - **Talos kube-controller-manager + kube-scheduler must bind on 0.0.0.0** for Prometheus to scrape them. Default Talos binds to 127.0.0.1 only. Fix lives at `talos/patches/cluster-scheduler-controller-bind.yaml`. Symptom of missing this: perpetual `KubeSchedulerInstanceUnreachable` / `KubeControllerManagerInstanceUnreachable` / `TargetDown` alerts even with KPS's port overrides set.
 - **Prometheus + Alertmanager `externalUrl`** are set to `https://{prometheus,alertmanager}.internal.tylerrosnett.com`. Without these, "Source" links in Alertmanager UI and `generatorURL` in alert payloads default to in-cluster service DNS (`kube-prometheus-stack-prometheus.monitoring:9090`) which doesn't resolve outside the cluster.
 - **Longhorn manager restart-count cleanup is dangerous.** Deleting a `longhorn-manager` pod triggers an optimistic-concurrency race on Setting CR updates at startup (`Operation cannot be fulfilled on settings.longhorn.io "default-replica-count"`), which keeps fatal-exiting until contention settles. Symptom is a pod that keeps restarting after a clean delete. Resolution is to leave it alone or delete all longhorn-managers + driver-deployer together so they re-elect cleanly. Don't try to zero out their restart counts.
@@ -152,6 +153,20 @@ When adding a new app that should be behind CF Access (rather than just LAN-only
 - **"Use SSL/TLS for outgoing queries" must stay OFF** — Blocky listens plain DNS on :53, not DoT on :853.
 - Blocky must be the **only** DNS server in System → General; in forwarding mode Unbound races all listed servers, so a leftover `1.1.1.1` lets queries bypass the blocker. Also uncheck the WAN DNS override.
 - Split-DNS host overrides (`*.internal.tylerrosnett.com`) still win — Unbound answers them locally before forwarding, so Blocky never sees them.
+
+## Home Assistant + smart-plug energy monitoring
+
+`apps/home-assistant/` runs HA as a plain container (no Supervisor → **no add-on store, no UI file editor**). `hostNetwork: true` + `ClusterFirstWithHostNet` so HA can do mDNS discovery of LAN devices (Shelly plugs, HomeKit). Exposed at `ha.internal.tylerrosnett.com` / `homeassistant.internal.tylerrosnett.com` via the internal gateway. Config lives on the Longhorn PVC, **not in git** — edit via `kubectl -n home-assistant exec -it deploy/home-assistant -- vi /config/configuration.yaml`.
+
+Energy pipeline: Shelly Plug US Gen4 (LAN, static DHCP mappings at `192.168.1.250+`, hostnames `plug-<node>` registered in pfSense DNS) → HA Shelly integration → HA `prometheus:` integration → ServiceMonitor scrape → Grafana `Energy / Smart Plugs` dashboard (`extra-dashboards/dashboards/energy.json`).
+
+Gotchas (don't re-derive):
+
+- HA's `prometheus:` block in `configuration.yaml` uses `namespace: hass` → metrics are `hass_sensor_power_w`, `hass_sensor_energy_kwh`, `hass_binary_sensor_state` (community dashboards usually assume the default `homeassistant_` prefix).
+- The `filter.include_entity_globs` must match **current entity IDs** (`sensor.homelab_plug_*`). Renaming entities in HA silently breaks the export — symptom is `up{job="home-assistant"} == 1` (endpoint healthy, `hass_area_info` present) but zero sensor metrics. The integration only reads config at startup: `kubectl -n home-assistant rollout restart deploy/home-assistant` after any change.
+- ServiceMonitor lives in the `home-assistant` namespace because **the bearer-token Secret must be in the same namespace as the ServiceMonitor** (prometheus-operator constraint). Token is an HA long-lived access token, SOPS-encrypted at `apps/home-assistant/secrets/prometheus-token.sops.yaml`.
+- The Service needs `labels: app: home-assistant` — ServiceMonitors select Services by label, and the original Service had none.
+- Plugs are set to power-on default "On" and front-button lock (they feed cluster nodes/router); their `switch.*` entities are disabled in HA so nothing can toggle them. Factory reset: hold button 10s **within 60s of plug-in**.
 
 ## Uptime monitoring and Discord alerts
 
