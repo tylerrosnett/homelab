@@ -33,3 +33,7 @@ configMapGenerator:
     namespace: monitoring
     files:
       - dashboards/blocky.json
+  - name: dashboard-energy
+    namespace: monitoring
+    files:
+      - dashboards/energy.json
