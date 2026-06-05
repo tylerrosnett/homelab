@@ -93,6 +93,8 @@ DNS for public apps relies on the wildcard CNAME `*.tylerrosnett.com → <tunnel
 
 `CiliumL2AnnouncementPolicy/default-l2-policy` has `serviceSelector: { lb-announce: "true" }`. Only services with that label get their LB IP announced on the LAN. The internal gateway sets it via `spec.infrastructure.labels` on the Gateway. Don't label services you don't want LAN-reachable.
 
+**Never combine L2 announce with `externalTrafficPolicy: Local`.** Cilium's per-service lease election (`kubectl -n kube-system get lease | grep l2announce`) ignores pod placement, so a node with no local backend can win the lease, answer ARP, and blackhole all traffic. Symptom: pods Ready + endpoints populated but the LB IP times out from the LAN. Fix: delete the lease to force re-election; durable fix: use default `Cluster` policy. When retesting from a client, flush its ARP cache first (`sudo arp -d <ip>`) — a stale entry pointing at the old holder fakes continued failure after the lease moves.
+
 ## Observability conventions
 
 - Everything lives in `monitoring` namespace.
@@ -141,7 +143,7 @@ When adding a new app that should be behind CF Access (rather than just LAN-only
 
 - Raw manifests (no first-party Helm chart). Config is a ConfigMap (`config.yml`); `queryLog.type: none` (no per-request logging by choice — aggregate Prometheus metrics only). Upstreams are Cloudflare DoT (`tcp-tls:1.1.1.1:853` / `1.0.0.1:853`). Denylists: StevenBlack + hagezi pro, with an inline allowlist for false positives.
 - **2 replicas** with `requiredDuringScheduling` pod anti-affinity (DNS shouldn't flap on a node reboot). Namespace PSA is **`restricted`** — Blocky runs non-root and only needs `NET_BIND_SERVICE` (the one cap `restricted` permits) to bind :53.
-- **DNS Service** is `LoadBalancer` at `192.168.1.202` (`lb-announce: "true"` for L2 announce), ports 53/UDP+TCP, `externalTrafficPolicy: Local`. Separate ClusterIP `blocky-metrics:4000` backs the ServiceMonitor (`release: kube-prometheus-stack`). No gateway HTTPRoute — Blocky has no web UI.
+- **DNS Service** is `LoadBalancer` at `192.168.1.202` (`lb-announce: "true"` for L2 announce), ports 53/UDP+TCP, default `externalTrafficPolicy` (`Cluster` — do NOT set `Local`, see L2 announcement scoping). Separate ClusterIP `blocky-metrics:4000` backs the ServiceMonitor (`release: kube-prometheus-stack`). No gateway HTTPRoute — Blocky has no web UI.
 - Because of Model A, all queries reach Blocky from pfSense's IP, so there is no per-client granularity in metrics (consistent with the no-logging choice).
 
 **pfSense forwarding-mode gotchas (don't re-derive):**
