@@ -12,3 +12,4 @@ resources:
   - appflowy-worker.yaml
   - frontends.yaml
   - appflowy-search.yaml
+  - nginx.yaml
