@@ -8,3 +8,4 @@ resources:
   - redis.yaml
   - minio.yaml
   - gotrue.yaml
+  - appflowy-cloud.yaml
