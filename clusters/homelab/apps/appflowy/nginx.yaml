@@ -14,6 +14,11 @@ data:
             '' close;
         }
 
+        map $http_x_forwarded_proto $client_proto {
+            default $http_x_forwarded_proto;
+            ''      $scheme;
+        }
+
         server {
             listen 8080;
             location = /stub_status {
@@ -43,7 +48,7 @@ data:
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Forwarded-Proto $client_proto;
                 proxy_read_timeout 86400s;
             }
 
@@ -90,7 +95,7 @@ data:
                 proxy_set_header Host minio:9000;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Forwarded-Proto $client_proto;
                 rewrite ^/minio-api/(.*) /$1 break;
                 proxy_connect_timeout 300s;
                 proxy_read_timeout 600s;
@@ -108,9 +113,9 @@ data:
                 proxy_set_header X-Forwarded-Host $http_host;
                 proxy_set_header Host $http_host;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Forwarded-Proto $client_proto;
                 proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Scheme $scheme;
+                proxy_set_header X-Scheme $client_proto;
                 proxy_http_version 1.1;
                 proxy_set_header Upgrade $http_upgrade;
                 proxy_set_header Connection 'upgrade';
@@ -120,7 +125,7 @@ data:
             # AppFlowy Web (catch-all)
             location / {
                 proxy_pass http://appflowy-web:80;
-                proxy_set_header X-Scheme $scheme;
+                proxy_set_header X-Scheme $client_proto;
                 proxy_set_header Host $host;
             }
         }
