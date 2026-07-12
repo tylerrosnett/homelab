@@ -6,3 +6,4 @@ resources:
   - secrets/appflowy.sops.yaml
   - postgres.yaml
   - redis.yaml
+  - minio.yaml
