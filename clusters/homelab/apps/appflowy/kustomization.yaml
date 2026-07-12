@@ -13,3 +13,4 @@ resources:
   - frontends.yaml
   - appflowy-search.yaml
   - nginx.yaml
+  - httproutes.yaml
