@@ -11,3 +11,4 @@ resources:
   - appflowy-cloud.yaml
   - appflowy-worker.yaml
   - frontends.yaml
+  - appflowy-search.yaml
