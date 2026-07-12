@@ -26,16 +26,9 @@ data:
             client_max_body_size 10M;
             underscores_in_headers on;
 
-            set $appflowy_cloud_backend "http://appflowy-cloud:8000";
-            set $gotrue_backend "http://gotrue:9999";
-            set $admin_frontend_backend "http://admin-frontend:3000";
-            set $appflowy_web_backend "http://appflowy-web:80";
-            set $minio_api_backend "http://minio:9000";
-            set $minio_internal_host "minio:9000";
-
             # GoTrue
             location /gotrue/ {
-                proxy_pass $gotrue_backend;
+                proxy_pass http://gotrue:9999;
                 rewrite ^/gotrue(/.*)$ $1 break;
                 proxy_set_header Host $http_host;
                 proxy_pass_request_headers on;
@@ -43,7 +36,7 @@ data:
 
             # WebSocket
             location /ws {
-                proxy_pass $appflowy_cloud_backend;
+                proxy_pass http://appflowy-cloud:8000;
                 proxy_http_version 1.1;
                 proxy_set_header Upgrade $http_upgrade;
                 proxy_set_header Connection "Upgrade";
@@ -55,18 +48,18 @@ data:
             }
 
             location /api {
-                proxy_pass $appflowy_cloud_backend;
+                proxy_pass http://appflowy-cloud:8000;
                 proxy_set_header X-Request-Id $request_id;
                 proxy_set_header Host $http_host;
 
                 location ~* ^/api/workspace/([a-zA-Z0-9_-]+)/publish$ {
-                    proxy_pass $appflowy_cloud_backend;
+                    proxy_pass http://appflowy-cloud:8000;
                     proxy_request_buffering off;
                     client_max_body_size 256M;
                 }
 
                 location /api/chat {
-                    proxy_pass $appflowy_cloud_backend;
+                    proxy_pass http://appflowy-cloud:8000;
                     proxy_http_version 1.1;
                     proxy_set_header Connection "";
                     chunked_transfer_encoding on;
@@ -78,7 +71,7 @@ data:
                 }
 
                 location /api/import {
-                    proxy_pass $appflowy_cloud_backend;
+                    proxy_pass http://appflowy-cloud:8000;
                     proxy_set_header X-Request-Id $request_id;
                     proxy_set_header Host $http_host;
                     proxy_read_timeout 600s;
@@ -93,8 +86,8 @@ data:
 
             # MinIO presigned URLs
             location /minio-api/ {
-                proxy_pass $minio_api_backend;
-                proxy_set_header Host $minio_internal_host;
+                proxy_pass http://minio:9000;
+                proxy_set_header Host minio:9000;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                 proxy_set_header X-Forwarded-Proto $scheme;
@@ -111,7 +104,7 @@ data:
 
             # Admin console
             location /console {
-                proxy_pass $admin_frontend_backend;
+                proxy_pass http://admin-frontend:3000;
                 proxy_set_header X-Forwarded-Host $http_host;
                 proxy_set_header Host $http_host;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -126,7 +119,7 @@ data:
 
             # AppFlowy Web (catch-all)
             location / {
-                proxy_pass $appflowy_web_backend;
+                proxy_pass http://appflowy-web:80;
                 proxy_set_header X-Scheme $scheme;
                 proxy_set_header Host $host;
             }
@@ -161,13 +154,3 @@ spec:
       volumes:
         - name: conf
           configMap: { name: nginx-conf }
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: nginx
-  namespace: appflowy
-spec:
-  selector: { app: nginx }
-  ports:
-    - { name: http, port: 80, targetPort: 80 }
