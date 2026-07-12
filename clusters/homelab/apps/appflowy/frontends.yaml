@@ -55,6 +55,13 @@ spec:
               value: "http://gotrue:9999"
             - name: APPFLOWY_BASE_URL
               value: "http://appflowy-cloud:8000"
+            # Next.js Server Actions reject requests whose Origin isn't listed here
+            # (trustHostHeader:false). Must be the browser-facing origin, not the
+            # internal API URL. Internal-only on purpose: server actions from the
+            # public hostname stay rejected, so the super-admin console is not
+            # usable over the public cf-tunnel route.
+            - name: APPFLOWY_ALLOWED_ORIGINS
+              value: "https://appflowy.internal.tylerrosnett.com"
           ports:
             - { name: http, containerPort: 3000 }
 ---
