@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: appflowy-env
+data:
+  # --- external URLs (canonical = public) ---
+  APPFLOWY_BASE_URL: "https://appflowy.tylerrosnett.com"
+  APPFLOWY_WEB_URL: "https://appflowy.tylerrosnett.com"
+  APPFLOWY_WEBSOCKET_BASE_URL: "wss://appflowy.tylerrosnett.com/ws/v2"
+  API_EXTERNAL_URL: "https://appflowy.tylerrosnett.com/gotrue"
+  APPFLOWY_S3_PRESIGNED_URL_ENDPOINT: "https://appflowy.tylerrosnett.com/minio-api"
+  # --- internal service discovery ---
+  APPFLOWY_GOTRUE_BASE_URL: "http://gotrue:9999"
+  APPFLOWY_REDIS_URI: "redis://redis:6379"
+  APPFLOWY_S3_MINIO_URL: "http://minio:9000"
+  APPFLOWY_SEARCH_SERVICE_URL: "http://appflowy-search:4002"
+  # --- postgres / redis / minio coordinates (non-secret) ---
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: "postgres"
+  POSTGRES_DB: "postgres"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  MINIO_HOST: "minio"
+  MINIO_PORT: "9000"
+  # --- S3 / storage ---
+  APPFLOWY_S3_USE_MINIO: "true"
+  APPFLOWY_S3_CREATE_BUCKET: "true"
+  APPFLOWY_S3_BUCKET: "appflowy"
+  # --- appflowy-cloud tuning ---
+  APPFLOWY_ENVIRONMENT: "production"
+  APPFLOWY_ACCESS_CONTROL: "true"
+  APPFLOWY_DATABASE_MAX_CONNECTIONS: "40"
+  APPFLOWY_WEBSOCKET_MAILBOX_SIZE: "6000"
+  AI_ENABLED: "false"
+  RUST_LOG: "info"
+  # --- gotrue (non-secret) ---
+  GOTRUE_JWT_EXP: "604800"
+  GOTRUE_DB_DRIVER: "postgres"
+  GOTRUE_SITE_URL: "appflowy-flutter://"
+  GOTRUE_URI_ALLOW_LIST: "**"
+  GOTRUE_JWT_ADMIN_GROUP_NAME: "supabase_admin"
+  GOTRUE_MAILER_AUTOCONFIRM: "true"
+  GOTRUE_DISABLE_SIGNUP: "true"
+  GOTRUE_RATE_LIMIT_EMAIL_SENT: "100"
+  GOTRUE_SAML_ENABLED: "true"
+  # --- search ---
+  APPFLOWY_SEARCH_HOST: "[::]"
+  APPFLOWY_SEARCH_PORT: "4002"
+  APPFLOWY_KEYWORD_SEARCH_ENABLED: "true"
+  APPFLOWY_KEYWORD_WORKER_ENABLED: "true"
+  APPFLOWY_BACKGROUND_INDEXER_ENABLED: "true"
+  APPFLOWY_INDEXER_DATABASE_ENABLED: "false"
+  APPFLOWY_KEYWORD_INDEX_DIR: "/var/lib/appflowy/keyword_index"
+  APPFLOWY_KEYWORD_INDEX_MAP_SIZE_BYTES: "2147483648"
