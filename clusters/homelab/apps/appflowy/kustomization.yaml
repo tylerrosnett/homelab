@@ -7,3 +7,4 @@ resources:
   - postgres.yaml
   - redis.yaml
   - minio.yaml
+  - gotrue.yaml
