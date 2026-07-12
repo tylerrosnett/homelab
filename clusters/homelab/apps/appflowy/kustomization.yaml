@@ -5,3 +5,4 @@ resources:
   - config.yaml
   - secrets/appflowy.sops.yaml
   - postgres.yaml
+  - redis.yaml
