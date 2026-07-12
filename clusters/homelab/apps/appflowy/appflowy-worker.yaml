@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appflowy-worker
+  namespace: appflowy
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: appflowy-worker }
+  template:
+    metadata:
+      labels: { app: appflowy-worker }
+    spec:
+      containers:
+        - name: appflowy-worker
+          image: appflowyinc/appflowy_worker
+          envFrom:
+            - configMapRef: { name: appflowy-env }
+          env:
+            - name: APPFLOWY_WORKER_ENVIRONMENT
+              value: "production"
+            - name: APPFLOWY_WORKER_IMPORT_TICK_INTERVAL
+              value: "30"
+            - name: APPFLOWY_WORKER_DATABASE_NAME
+              value: "postgres"
+            - name: APPFLOWY_WORKER_REDIS_URL
+              value: "redis://redis:6379"
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: appflowy-secrets, key: POSTGRES_PASSWORD } }
+            - name: APPFLOWY_WORKER_DATABASE_URL
+              value: "postgres://postgres:$(POSTGRES_PASSWORD)@postgres:5432/postgres"
+            - name: APPFLOWY_S3_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: appflowy-secrets, key: AWS_ACCESS_KEY } }
+            - name: APPFLOWY_S3_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: appflowy-secrets, key: AWS_SECRET } }

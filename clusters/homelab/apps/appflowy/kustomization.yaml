@@ -9,3 +9,4 @@ resources:
   - minio.yaml
   - gotrue.yaml
   - appflowy-cloud.yaml
+  - appflowy-worker.yaml
