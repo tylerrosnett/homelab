@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: gotrue
-          image: appflowyinc/gotrue
+          image: appflowyinc/gotrue:0.16.5
           envFrom:
             - configMapRef: { name: appflowy-env }
           env:

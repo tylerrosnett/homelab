@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: appflowy-cloud
-          image: appflowyinc/appflowy_cloud
+          image: appflowyinc/appflowy_cloud:0.16.5
           envFrom:
             - configMapRef: { name: appflowy-env }
           env:

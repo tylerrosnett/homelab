@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: appflowy-web
-          image: appflowyinc/appflowy_web
+          image: appflowyinc/appflowy_web:0.15.5
           env:
             - name: APPFLOWY_BASE_URL
               value: "https://appflowy.tylerrosnett.com"
@@ -49,7 +49,7 @@ spec:
     spec:
       containers:
         - name: admin-frontend
-          image: appflowyinc/admin_frontend
+          image: appflowyinc/admin_frontend:0.16.5
           env:
             - name: APPFLOWY_GOTRUE_BASE_URL
               value: "http://gotrue:9999"

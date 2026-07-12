@@ -15,3 +15,4 @@ resources:
   - nginx.yaml
   - httproutes.yaml
   - networkpolicy.yaml
+

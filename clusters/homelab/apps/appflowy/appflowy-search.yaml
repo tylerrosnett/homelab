@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: appflowy-search
-          image: appflowyinc/appflowy_search
+          image: appflowyinc/appflowy_search:0.16.3
           envFrom:
             - configMapRef: { name: appflowy-env }
           env:
