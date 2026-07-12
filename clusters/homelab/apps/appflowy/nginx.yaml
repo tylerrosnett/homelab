@@ -154,3 +154,13 @@ spec:
       volumes:
         - name: conf
           configMap: { name: nginx-conf }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: appflowy
+spec:
+  selector: { app: nginx }
+  ports:
+    - { name: http, port: 80, targetPort: 80 }
