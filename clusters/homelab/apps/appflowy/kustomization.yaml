@@ -14,3 +14,4 @@ resources:
   - appflowy-search.yaml
   - nginx.yaml
   - httproutes.yaml
+  - networkpolicy.yaml

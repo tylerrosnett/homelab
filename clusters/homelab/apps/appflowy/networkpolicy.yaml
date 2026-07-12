@@ -1,0 +1,14 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: appflowy-nginx-ingress
+  namespace: appflowy
+spec:
+  endpointSelector:
+    matchLabels:
+      app: nginx
+  ingress:
+    - fromEntities:
+        - ingress
+        - host
+        - remote-node
