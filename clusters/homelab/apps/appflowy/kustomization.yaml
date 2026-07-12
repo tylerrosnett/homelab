@@ -10,3 +10,4 @@ resources:
   - gotrue.yaml
   - appflowy-cloud.yaml
   - appflowy-worker.yaml
+  - frontends.yaml
