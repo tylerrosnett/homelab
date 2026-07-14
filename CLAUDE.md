@@ -115,7 +115,7 @@ The cluster trusts a single Cloudflare Access SaaS OIDC application for all inte
 - **kube-apiserver** validates id_tokens via `--oidc-issuer-url`, `--oidc-client-id`, `--oidc-username-claim=email` (set in `talos/patches/cluster-apiserver-oidc.sops.yaml`, SOPS-encrypted).
 - **ClusterRoleBinding** at `clusters/homelab/system/cluster-admin-oidc/secrets/clusterrolebinding.sops.yaml` (SOPS-encrypted) maps the user email → `cluster-admin`.
 - **Headlamp** (`apps/headlamp/`) uses the same SaaS app via browser flow. Helm values inject OIDC creds from the SOPS secret via Flux's `spec.valuesFrom` (not `secret.create: false`, which hits a chart bug that skips OIDC env injection).
-- **kubectl** uses `kubelogin` against the same app with `http://localhost:8000` as an additional redirect URL on the SaaS app.
+- **kubectl** uses `kubelogin` against the same app with `http://localhost:8000` as an additional redirect URL on the SaaS app. The SaaS app has **Allow PKCE without Client Secret** enabled, so kubectl runs as a public client and needs no client secret (Headlamp still passes its secret; that toggle only *also* permits secret-less PKCE requests).
 
 **CF Access SaaS OIDC gotchas** (don't re-derive these):
 - **PKCE is required** by CF for SaaS apps. Headlamp values must set `config.oidc.usePKCE: true`; kubelogin must pass `--oidc-pkce-method=S256`. Without it CF rejects with `code_challenge is required for this client`.
