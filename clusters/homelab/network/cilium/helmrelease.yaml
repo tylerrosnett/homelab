@@ -28,6 +28,7 @@ spec:
     k8sServicePort: 6443
     gatewayAPI:
       enabled: true
+      xffNumTrustedHops: 1
     ipam:
       mode: kubernetes
     cgroup:
