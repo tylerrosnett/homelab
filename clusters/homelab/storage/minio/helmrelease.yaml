@@ -1,0 +1,45 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: minio
+  namespace: storage
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: minio
+      version: 5.4.0
+      sourceRef:
+        kind: HelmRepository
+        name: minio
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    mode: standalone
+    replicas: 1
+    existingSecret: minio-root
+    persistence:
+      enabled: true
+      storageClass: longhorn
+      size: 20Gi
+    resources:
+      requests:
+        memory: 512Mi
+    buckets:
+      - name: outline
+        policy: none
+        purge: false
+    users:
+      - accessKey: outline
+        existingSecret: minio-root
+        existingSecretKey: outline-secretkey
+        policy: readwrite
+    ingress:
+      enabled: false
+    consoleIngress:
+      enabled: false
