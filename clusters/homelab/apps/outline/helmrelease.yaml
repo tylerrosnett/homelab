@@ -27,7 +27,7 @@ spec:
   values:
     url: https://outline.tylerrosnett.com
     web:
-      forceHttps: true
+      forceHttps: false
     replicaCount: 1
     ingress:
       enabled: false
