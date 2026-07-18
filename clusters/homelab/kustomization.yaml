@@ -19,6 +19,7 @@ resources:
   - network/tailscale.yaml
   - network/tailscale-connectors.yaml
   - storage/longhorn
+  - storage/minio.yaml
   - observability/kube-prometheus-stack.yaml
   - observability/loki.yaml
   - observability/alloy.yaml
