@@ -1,0 +1,15 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: outline-public
+  namespace: outline
+spec:
+  parentRefs:
+    - name: cf-tunnel
+      namespace: kube-system
+  hostnames:
+    - outline.tylerrosnett.com
+  rules:
+    - backendRefs:
+        - name: outline
+          port: 80

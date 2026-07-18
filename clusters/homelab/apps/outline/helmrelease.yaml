@@ -1,0 +1,71 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: outline
+  namespace: outline
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: outline
+      version: 0.9.2
+      sourceRef:
+        kind: HelmRepository
+        name: outline
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  valuesFrom:
+    - kind: Secret
+      name: outline-secrets
+      valuesKey: postgres-password
+      targetPath: postgresql.auth.password
+  values:
+    url: https://outline.tylerrosnett.com
+    web:
+      forceHttps: true
+    replicaCount: 1
+    ingress:
+      enabled: false
+    postgresql:
+      enabled: true
+      auth:
+        username: outline
+        database: outline
+      primary:
+        persistence:
+          enabled: true
+          storageClass: longhorn
+          size: 5Gi
+    redis:
+      enabled: true
+      auth:
+        enabled: false
+      master:
+        persistence:
+          enabled: true
+          storageClass: longhorn
+          size: 2Gi
+    fileStorage:
+      mode: s3
+      s3:
+        existingSecret: outline-secrets
+        accessKeyIdSecretKey: access-key-id
+        secretAccessKeySecretKey: secret-access-key
+        bucket: outline
+        region: us-east-1
+        bucketUrl: https://files.tylerrosnett.com
+        forcePathStyle: true
+        acl: private
+    secretKeyExternalSecret:
+      name: outline-secrets
+      key: secret-key
+    utilsSecretExternalSecret:
+      name: outline-secrets
+      key: utils-secret
+    extraSecretNamesForEnvFrom:
+      - outline-secrets
