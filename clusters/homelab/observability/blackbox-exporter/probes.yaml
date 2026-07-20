@@ -15,7 +15,6 @@ spec:
         - https://grafana.tylerrosnett.com
         - https://hello.tylerrosnett.com
         - https://2048.tylerrosnett.com
-        - https://appflowy.tylerrosnett.com
       labels:
         category: public
 ---
@@ -38,6 +37,5 @@ spec:
         - https://alertmanager.internal.tylerrosnett.com
         - https://headlamp.internal.tylerrosnett.com
         - https://hubble.internal.tylerrosnett.com
-        - https://appflowy.internal.tylerrosnett.com
       labels:
         category: internal
