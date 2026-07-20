@@ -12,3 +12,6 @@ spec:
         - ingress
         - host
         - remote-node
+    - fromEndpoints:
+        - matchLabels:
+            app: minio-job
