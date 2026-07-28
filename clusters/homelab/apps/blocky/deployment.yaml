@@ -22,7 +22,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
         - name: blocky
-          image: ghcr.io/0xerr0r/blocky:v0.33.0
+          image: ghcr.io/0xerr0r/blocky:v0.34.0
           args:
             - --config
             - /app/config/config.yml
