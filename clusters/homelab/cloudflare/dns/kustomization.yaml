@@ -4,4 +4,3 @@ resources:
   - namespace.yaml
   - wildcard.yaml
   - email.yaml
-  - minecraft.yaml
