@@ -6,3 +6,4 @@ resources:
   - deployment.yaml
   - service.yaml
   - secrets/curseforge.sops.yaml
+  - secrets/whitelist.sops.yaml

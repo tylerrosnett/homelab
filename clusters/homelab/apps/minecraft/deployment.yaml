@@ -51,11 +51,19 @@ spec:
             - name: ENFORCE_WHITELIST
               value: "TRUE"
             - name: WHITELIST
-              value: ""  # comma-separated Java-edition usernames — empty blocks everyone
+              valueFrom:
+                secretKeyRef:
+                  name: minecraft-whitelist
+                  key: WHITELIST
             - name: OPS
-              value: ""  # your username here
+              valueFrom:
+                secretKeyRef:
+                  name: minecraft-whitelist
+                  key: OPS
             - name: MOTD
               value: All The Mods 10
+            - name: LEVEL
+              value: world1  # new level name = fresh world; old one stays at /data/world until deleted
             - name: VIEW_DISTANCE
               value: "20"
             - name: SIMULATION_DISTANCE
