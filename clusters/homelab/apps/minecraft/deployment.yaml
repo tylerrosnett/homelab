@@ -41,7 +41,7 @@ spec:
                   name: curseforge
                   key: CF_API_KEY
             - name: MEMORY
-              value: 12G
+              value: 24G
             - name: USE_AIKAR_FLAGS
               value: "true"
             - name: ALLOW_FLIGHT
@@ -56,6 +56,12 @@ spec:
               value: ""  # your username here
             - name: MOTD
               value: All The Mods 10
+            - name: VIEW_DISTANCE
+              value: "20"
+            - name: SIMULATION_DISTANCE
+              value: "12"
+            - name: SYNC_CHUNK_WRITES
+              value: "false"  # async chunk saves — sync writes pay Longhorn replication latency on the main thread
             - name: TZ
               value: America/Los_Angeles
           ports:
@@ -83,10 +89,10 @@ spec:
                 - ALL
           resources:
             requests:
-              cpu: "2"
-              memory: 14Gi
+              cpu: "8"
+              memory: 32Gi
             limits:
-              memory: 16Gi  # no CPU limit — throttling a game server tanks TPS
+              memory: 40Gi
           volumeMounts:
             - name: data
               mountPath: /data
