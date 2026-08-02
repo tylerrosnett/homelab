@@ -64,6 +64,43 @@ nodes:
         vip:
           ip: 192.168.1.246
 
+  # Proxmox VMs on the R640s (baobab = 192.168.1.12, redwood = 192.168.1.13)
+  - hostname: birch
+    ipAddress: 192.168.1.10
+    installDiskSelector:
+      size: '>= 200GB'
+      type: ssd  # requires "SSD emulation" ticked on the Proxmox virtual disk
+    controlPlane: false
+    nodeLabels:
+      homelab/node-class: game
+    networkInterfaces:
+      - deviceSelector:
+          driver: virtio_net
+        dhcp: false
+        addresses:
+          - 192.168.1.10/24
+        routes:
+          - network: 0.0.0.0/0
+            gateway: 192.168.1.1
+
+  - hostname: cedar
+    ipAddress: 192.168.1.11
+    installDiskSelector:
+      size: '>= 200GB'
+      type: ssd  # requires "SSD emulation" ticked on the Proxmox virtual disk
+    controlPlane: false
+    nodeLabels:
+      homelab/node-class: bulk
+    networkInterfaces:
+      - deviceSelector:
+          driver: virtio_net
+        dhcp: false
+        addresses:
+          - 192.168.1.11/24
+        routes:
+          - network: 0.0.0.0/0
+            gateway: 192.168.1.1
+
 controlPlane:
   schematic:
     customization:
@@ -77,6 +114,17 @@ controlPlane:
     - "@./patches/cluster-apiserver-oidc.sops.yaml"
     - "@./patches/cluster-apiserver-audit.yaml"
     - "@./patches/cluster-scheduler-controller-bind.yaml"
+    - "@./patches/machine-kubelet.yaml"
+
+worker:
+  schematic:
+    customization:
+      systemExtensions:
+        officialExtensions:
+          - siderolabs/iscsi-tools
+          - siderolabs/util-linux-tools
+          - siderolabs/qemu-guest-agent
+  patches:
     - "@./patches/machine-kubelet.yaml"
 
 patches:

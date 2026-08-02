@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft
+  namespace: minecraft
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # RWO PVC — RollingUpdate deadlocks (same as Grafana)
+  selector:
+    matchLabels:
+      app: minecraft
+  template:
+    metadata:
+      labels:
+        app: minecraft
+    spec:
+      nodeSelector:
+        homelab/node-class: game
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: minecraft
+          image: itzg/minecraft-server:java21
+          env:
+            - name: EULA
+              value: "TRUE"
+            - name: TYPE
+              value: AUTO_CURSEFORGE
+            - name: CF_SLUG
+              value: all-the-mods-10
+            - name: CF_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: curseforge
+                  key: CF_API_KEY
+            - name: MEMORY
+              value: 12G
+            - name: USE_AIKAR_FLAGS
+              value: "true"
+            - name: ALLOW_FLIGHT
+              value: "TRUE"
+            - name: ENABLE_WHITELIST
+              value: "TRUE"
+            - name: ENFORCE_WHITELIST
+              value: "TRUE"
+            - name: WHITELIST
+              value: ""  # comma-separated Java-edition usernames — empty blocks everyone
+            - name: OPS
+              value: ""  # your username here
+            - name: MOTD
+              value: All The Mods 10
+            - name: TZ
+              value: America/Los_Angeles
+          ports:
+            - name: minecraft
+              containerPort: 25565
+              protocol: TCP
+          startupProbe:
+            exec:
+              command: ["mc-health"]
+            periodSeconds: 10
+            failureThreshold: 120  # first boot downloads ~300 mods + generates world
+          readinessProbe:
+            exec:
+              command: ["mc-health"]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["mc-health"]
+            periodSeconds: 30
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: "2"
+              memory: 14Gi
+            limits:
+              memory: 16Gi  # no CPU limit — throttling a game server tanks TPS
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: minecraft-data

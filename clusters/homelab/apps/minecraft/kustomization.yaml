@@ -2,6 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - namespace.yaml
-  - wildcard.yaml
-  - email.yaml
-  - minecraft.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - secrets/curseforge.sops.yaml
