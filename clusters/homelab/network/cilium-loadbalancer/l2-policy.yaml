@@ -7,9 +7,13 @@ spec:
   externalIPs: true
   interfaces:
     - eno1
+  # Only control planes announce: they own eno1 (workers have virtio NIC names
+  # that don't match `interfaces`, so a worker winning a lease blackholes the IP)
+  # and they're the always-on tier (workers power off).
   nodeSelector:
-    matchLabels:
-      kubernetes.io/os: linux
+    matchExpressions:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
   serviceSelector:
     matchLabels:
       lb-announce: "true"
