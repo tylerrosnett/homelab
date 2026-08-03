@@ -41,7 +41,7 @@ spec:
                   name: curseforge
                   key: CF_API_KEY
             - name: MEMORY
-              value: 24G
+              value: 12G
             - name: USE_AIKAR_FLAGS
               value: "true"
             - name: ALLOW_FLIGHT
@@ -65,9 +65,9 @@ spec:
             - name: LEVEL
               value: world1  # new level name = fresh world; old one stays at /data/world until deleted
             - name: VIEW_DISTANCE
-              value: "20"
+              value: "10"
             - name: SIMULATION_DISTANCE
-              value: "12"
+              value: "6"
             - name: SYNC_CHUNK_WRITES
               value: "false"  # async chunk saves — sync writes pay Longhorn replication latency on the main thread
             - name: TZ
@@ -98,7 +98,7 @@ spec:
           resources:
             requests:
               cpu: "8"
-              memory: 32Gi
+              memory: 16Gi
             limits:
               memory: 40Gi
           volumeMounts:
