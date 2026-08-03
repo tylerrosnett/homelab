@@ -54,6 +54,7 @@ sops <file>                                                                   # 
 - Auto-encrypted paths: `talos/talsecret.sops.yaml`, `talos/patches/*.sops.yaml` (encrypted Talos patches — talhelper auto-decrypts on `genconfig`), and anything matching `clusters/.*/secrets/.*\.yaml`. When creating new secret files, place them under one of these paths so `.sops.yaml` rules apply automatically — otherwise they'll be committed in plaintext.
 - Non-Secret resources can also be SOPS-encrypted (e.g. the ClusterRoleBinding at `system/cluster-admin-oidc/secrets/clusterrolebinding.sops.yaml` keeps the admin email out of plaintext git). Flux's KS-level `decryption: sops` patch (in `flux-system/flux-instance.yaml`) decrypts any kind, not just `Secret`.
 - The private key lives outside the repo; `*.agekey` and `.secrets` are gitignored.
+- Private key backups (2026-08-03): Apple Passwords and Bitwarden. To restore, place the `AGE-SECRET-KEY-1...` line in `~/.config/sops/age/keys.txt` and check it with `age-keygen -y` against the recipient above.
 - `talos/clusterconfig/` is gitignored — never commit generated per-node configs.
 
 ## Conventions
