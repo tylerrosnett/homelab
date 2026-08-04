@@ -1,0 +1,168 @@
+---
+# Pre-merge validation for the Flux GitOps tree.
+#
+# Nothing here talks to the cluster and CI holds no age key, so every check runs
+# against the repo as committed. `kustomize` and `yq` (mikefarah v4) ship with the
+# GitHub-hosted ubuntu runner image; only kubeconform is installed.
+#
+# The two Kubernetes jobs walk `git ls-files '**/kustomization.yaml'`, which keeps
+# talos/ out of scope on its own -- talhelper config is not Kubernetes manifests.
+# The sops job does cover talos/, matching .sops.yaml.
+#
+# There is deliberately no flux-local job: flux-local was sunsetted upstream in
+# July 2026, and on this repo its `flux build ks` step dies on the SOPS files
+# because .sops.yaml encrypts whole documents (apiVersion and kind included),
+# leaving nothing for the Flux decoder to parse.
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  # renovate: datasource=github-releases depName=yannh/kubeconform
+  KUBECONFORM_VERSION: v0.8.0
+  # Built-in Kubernetes schemas cover core/apps/etc; the CRD catalog covers Flux,
+  # Gateway API, Cilium, Prometheus Operator, cert-manager, Crossplane, Tailscale.
+  CRDS_CATALOG: "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+
+jobs:
+  kustomize-build:
+    name: kustomize build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build cluster root
+        run: kustomize build clusters/homelab > /dev/null
+
+      - name: Build every kustomization directory
+        run: |
+          set -euo pipefail
+
+          rc=0
+          while IFS= read -r file; do
+            dir="$(dirname "${file}")"
+            if kustomize build "${dir}" > /dev/null; then
+              echo "ok    ${dir}"
+            else
+              echo "::error file=${file}::kustomize build failed"
+              rc=1
+            fi
+          done < <(git ls-files '**/kustomization.yaml')
+
+          exit "${rc}"
+
+  kubeconform:
+    name: kubeconform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install kubeconform
+        run: |
+          set -euo pipefail
+
+          archive="kubeconform-linux-amd64.tar.gz"
+          base="https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}"
+
+          curl -fsSL -o "${archive}" "${base}/${archive}"
+          curl -fsSL -o CHECKSUMS "${base}/CHECKSUMS"
+
+          expected="$(awk -v want="${archive}" '$2 == want { print $1 }' CHECKSUMS)"
+          if [ -z "${expected}" ]; then
+            echo "::error::CHECKSUMS for ${KUBECONFORM_VERSION} has no entry for ${archive}"
+            exit 1
+          fi
+          echo "${expected}  ${archive}" | sha256sum --check -
+
+          sudo tar -xzf "${archive}" -C /usr/local/bin kubeconform
+          rm -f "${archive}" CHECKSUMS
+          kubeconform -v
+
+      - name: Validate rendered manifests
+        run: |
+          set -euo pipefail
+
+          # Shared across every build so the CRD catalog is fetched once per kind.
+          cache="$(mktemp -d)"
+
+          # SOPS-encrypted documents carry an extra top-level `sops:` key that -strict
+          # rejects, and CI cannot decrypt them. Drop those documents before validating.
+          validate() {
+            kustomize build "$1" \
+              | yq 'select(has("sops") | not)' \
+              | kubeconform \
+                  -strict \
+                  -summary \
+                  -ignore-missing-schemas \
+                  -cache "${cache}" \
+                  -schema-location default \
+                  -schema-location "${CRDS_CATALOG}"
+          }
+
+          rc=0
+
+          echo "== clusters/homelab (root) =="
+          validate clusters/homelab || rc=1
+
+          while IFS= read -r file; do
+            dir="$(dirname "${file}")"
+            if [ "${dir}" = "clusters/homelab" ]; then
+              continue
+            fi
+            echo "== ${dir} =="
+            if ! validate "${dir}"; then
+              echo "::error file=${file}::kubeconform validation failed"
+              rc=1
+            fi
+          done < <(git ls-files '**/kustomization.yaml')
+
+          exit "${rc}"
+
+  sops-encrypted:
+    name: sops encryption guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Assert every secret path is encrypted
+        run: |
+          set -euo pipefail
+
+          # Mirrors the creation_rules path_regex entries in .sops.yaml. Those rules
+          # only take effect when somebody actually runs `sops -e`, so a forgotten
+          # encryption commits a plaintext secret with no warning. This is the backstop.
+          pattern='^(clusters/.*/secrets/.*\.ya?ml|talos/talsecret\.sops\.ya?ml|talos/patches/.*\.sops\.ya?ml)$'
+
+          mapfile -t files < <(git ls-files | grep -E "${pattern}" || true)
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::No tracked files matched the encrypted-path patterns - either every secret is gone or this pattern has drifted from .sops.yaml"
+            exit 1
+          fi
+
+          rc=0
+          for file in "${files[@]}"; do
+            missing=""
+            grep -qF 'ENC[AES256_GCM' "${file}" || missing="${missing} ENC[AES256_GCM markers,"
+            grep -qE '^sops:' "${file}" || missing="${missing} top-level sops: key,"
+
+            if [ -z "${missing}" ]; then
+              echo "encrypted    ${file}"
+            else
+              echo "::error file=${file}::not SOPS-encrypted - missing${missing%,}. Run: sops -e -i ${file}"
+              rc=1
+            fi
+          done
+
+          echo "checked ${#files[@]} file(s)"
+          exit "${rc}"
