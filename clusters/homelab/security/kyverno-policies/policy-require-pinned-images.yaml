@@ -38,14 +38,15 @@ spec:
                 - Pod
       validate:
         message: >-
-          Image tag must look like a pinned version (for example v2.27.0 or
-          2025.1.0) or be digest-pinned. Floating tags are not allowed.
+          Image tag must look like a pinned version (for example v2.27.0,
+          2025.1.0, or RELEASE.2024-12-18T13-15-44Z) or be digest-pinned.
+          Floating tags are not allowed.
         foreach:
           - list: "request.object.spec.containers"
             deny:
               conditions:
                 all:
-                  - key: "{{ regex_match(':v?[0-9][^/]*$', element.image) }}"
+                  - key: "{{ regex_match(':(v|RELEASE[.])?[0-9][^/]*$', element.image) }}"
                     operator: Equals
                     value: false
                   - key: "{{ contains(element.image, '@sha256:') }}"
@@ -55,7 +56,7 @@ spec:
             deny:
               conditions:
                 all:
-                  - key: "{{ regex_match(':v?[0-9][^/]*$', element.image) }}"
+                  - key: "{{ regex_match(':(v|RELEASE[.])?[0-9][^/]*$', element.image) }}"
                     operator: Equals
                     value: false
                   - key: "{{ contains(element.image, '@sha256:') }}"
