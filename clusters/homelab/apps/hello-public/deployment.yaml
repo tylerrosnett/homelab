@@ -13,6 +13,12 @@ spec:
       labels:
         app: hello
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: http-echo
           image: hashicorp/http-echo:1.0.0
@@ -22,6 +28,22 @@ spec:
           ports:
             - name: http
               containerPort: 5678
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 30
           resources:
             requests:
               cpu: 5m

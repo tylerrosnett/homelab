@@ -22,6 +22,10 @@ spec:
   values:
     mode: standalone
     replicas: 1
+    # RWO Longhorn PVC — the chart default (RollingUpdate, maxSurge 100%) surges a second
+    # pod that can never attach the volume, wedging the rollout. Same trap as Grafana.
+    deploymentUpdate:
+      type: Recreate
     existingSecret: minio-root
     persistence:
       enabled: true

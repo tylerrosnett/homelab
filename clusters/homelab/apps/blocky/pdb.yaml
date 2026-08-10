@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: blocky
+  namespace: blocky
+spec:
+  # LAN-wide DNS: pfSense forwards every query here, so a drain must never take both pods.
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: blocky
