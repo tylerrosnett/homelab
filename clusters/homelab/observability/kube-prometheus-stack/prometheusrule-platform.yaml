@@ -10,11 +10,11 @@ spec:
     - name: flux.rules
       rules:
         # Flux 2.8 controllers no longer export gotk_reconcile_condition or
-        # gotk_suspend_status (only gotk_reconcile_duration_seconds), and this
-        # cluster has no kube-state-metrics customResourceState config, so
-        # gotk_resource_info does not exist either. controller-runtime's
-        # reconcile counter is the only per-resource-health signal available
-        # from the flux-system PodMonitor.
+        # gotk_suspend_status (only gotk_reconcile_duration_seconds).
+        # gotk_resource_info comes from kube-state-metrics customResourceState
+        # (configured in this directory's helmrelease.yaml), not from the Flux
+        # controllers; controller-runtime's reconcile counter remains the only
+        # signal from the flux-system PodMonitor itself.
         - alert: FluxReconciliationFailing
           expr: sum by (controller) (rate(controller_runtime_reconcile_total{namespace="flux-system", result="error"}[5m])) > 0
           for: 15m
@@ -31,6 +31,16 @@ spec:
           annotations:
             summary: "Flux controller {{ $labels.pod }} is not being scraped"
             description: "Prometheus has failed to scrape {{ $labels.pod }} in flux-system for 15+ minutes. GitOps reconciliation may be stopped."
+        # 2h grace so deliberate suspends during manual testing don't page;
+        # this exists to catch the forgotten resume.
+        - alert: FluxResourceSuspended
+          expr: gotk_resource_info{suspended="true"} == 1
+          for: 2h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Flux {{ $labels.customresource_kind }} {{ $labels.name }} has been suspended for 2h+"
+            description: "{{ $labels.customresource_kind }} {{ $labels.exported_namespace }}/{{ $labels.name }} is suspended, so git changes are not being applied to it. Resume with: flux resume {{ $labels.customresource_kind }} {{ $labels.name }} -n {{ $labels.exported_namespace }}"
     - name: longhorn.rules
       rules:
         # longhorn_volume_robustness is label-based in Longhorn 1.11+: one
