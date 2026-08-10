@@ -10,9 +10,21 @@ metadata:
       Every container must declare CPU and memory requests so the scheduler
       can place pods honestly. The nano-preset Postgres taught this lesson.
 spec:
-  validationFailureAction: Audit
+  validationFailureAction: Enforce
+  validationFailureActionOverrides:
+    - action: Audit
+      namespaces:
+        - kube-system
+        - flux-system
+        - longhorn-system
+        - monitoring
+        - crossplane-system
+        - tailscale
+        - cert-manager
+        - kyverno
+        - home-assistant
   background: true
-  failurePolicy: Ignore
+  failurePolicy: Fail
   rules:
     - name: validate-resource-requests
       match:

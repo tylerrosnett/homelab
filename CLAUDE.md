@@ -138,13 +138,16 @@ When adding a new app that should be behind CF Access (rather than just LAN-only
 
 ## Kyverno admission policy
 
-`security/kyverno/` (operator, CRDs) and `security/kyverno-policies/` (prebuilt Pod Security Standards `restricted` set + 4 custom ClusterPolicies) are two Flux Kustomizations per the CRD/CR ordering pattern. **Everything runs `validationFailureAction: Audit` with `failurePolicy: Ignore` — nothing blocks admission.** Violations land in PolicyReports: `kubectl get polr -A` (namespaced) and `kubectl get cpolr` (cluster-scoped, where the Namespace-targeted policy reports).
+`security/kyverno/` (operator, CRDs) and `security/kyverno-policies/` (prebuilt Pod Security Standards `restricted` set + 4 custom ClusterPolicies) are two Flux Kustomizations per the CRD/CR ordering pattern. **The PSS set and three custom policies run `Enforce` with `failurePolicy: Fail`** — nine infra namespaces are held at Audit via `validationFailureActionOverrides` (the list lives in each policy manifest and the kyverno-policies HelmRelease; keep them in sync). New namespaces are enforced by default. The admission controller runs 3 replicas because a failing-closed webhook with one replica blocks all admission when its pod dies. Violations land in PolicyReports: `kubectl get polr -A` (namespaced) and `kubectl get cpolr` (cluster-scoped, where the Namespace-targeted policy reports).
 
 - Custom policies: `require-pinned-images` (tag must look version-pinned — leading digit with optional `v` or `RELEASE.` prefix — or be digest-pinned; heuristic), `require-probes` (any one of liveness/readiness/startup — faithful copy of the upstream policy, deliberately looser than "readiness and liveness"), `require-requests` (CPU + memory requests), `require-cnp-in-public-namespaces` (background apiCall scan; report-only by nature since the namespace exists before its CNP).
 - The apiCall policy depends on the `cilium.io` RBAC `extraResources` set on **both** admissionController and reportsController in the operator HelmRelease. Removing it makes background scans silently error.
 - Six namespaces carry `expose-public: "true"` and are in the CNP policy's scope: hello-public, game-2048, outline, storage, monitoring, ntfy.
-- Expected audit violators, all deliberate: home-assistant (loose on purpose), monitoring's node-exporter, longhorn-system, assorted chart-managed jobs.
-- **Enforce flip order, per policy:** zero FAILs in reports → set `admissionController.replicas: 3` (a single replica with a failing-closed webhook blocks all admission when its pod dies) → flip the policy (`spec.validationFailureAction: Enforce` + `spec.failurePolicy: Fail` for custom; `validationFailureActionByPolicy` for PSS) → exempt accepted violators via `validationFailureActionOverrides`.
+- Expected audit violators in the excluded namespaces, all deliberate: home-assistant (loose on purpose), monitoring's node-exporter, longhorn-system, assorted chart-managed jobs.
+- **`require-cnp-in-public-namespaces` must stay Audit forever.** Flux applies a Namespace before its CNP, so Enforce would deny every new public app's namespace creation. It is a compliance report, not a gate.
+- **`require-probes` excludes Job-owned pods** (precondition on ownerReferences). Batch pods have no probes; without the exclusion, every helm hook/helper job would be denied.
+- **Ad-hoc pods in enforced namespaces get denied** unless they carry resource requests and a restricted securityContext. Run `kubectl run`/`kubectl debug` scratch pods in an excluded namespace (e.g. `monitoring`) or give them a full spec.
+- A denial surfaces as a ReplicaSet/Job that cannot create pods — check its events (`kubectl describe rs/<name>`), not the pod list, and expect helm upgrades to report timeout rather than the denial itself.
 
 ## Tailscale subnet router
 

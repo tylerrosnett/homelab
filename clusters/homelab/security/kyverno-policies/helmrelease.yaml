@@ -21,5 +21,18 @@ spec:
       retries: 3
   values:
     podSecurityStandard: restricted
-    validationFailureAction: Audit
-    failurePolicy: Ignore
+    validationFailureAction: Enforce
+    failurePolicy: Fail
+    validationFailureActionOverrides:
+      all:
+        - action: Audit
+          namespaces:
+            - kube-system
+            - flux-system
+            - longhorn-system
+            - monitoring
+            - crossplane-system
+            - tailscale
+            - cert-manager
+            - kyverno
+            - home-assistant

@@ -12,9 +12,21 @@ metadata:
       or startupProbe so deployments, restarts, and upgrades are managed
       correctly.
 spec:
-  validationFailureAction: Audit
+  validationFailureAction: Enforce
+  validationFailureActionOverrides:
+    - action: Audit
+      namespaces:
+        - kube-system
+        - flux-system
+        - longhorn-system
+        - monitoring
+        - crossplane-system
+        - tailscale
+        - cert-manager
+        - kyverno
+        - home-assistant
   background: true
-  failurePolicy: Ignore
+  failurePolicy: Fail
   rules:
     - name: validate-probes
       match:

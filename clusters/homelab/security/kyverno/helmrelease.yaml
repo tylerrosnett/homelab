@@ -27,6 +27,9 @@ spec:
       labels:
         grafana_dashboard: "1"
     admissionController:
+      # 3 replicas before any Enforce policy: a single replica behind a
+      # failing-closed webhook blocks all admission when its pod dies.
+      replicas: 3
       serviceMonitor:
         enabled: true
       rbac:

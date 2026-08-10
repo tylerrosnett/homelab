@@ -11,9 +11,21 @@ metadata:
       digit, optionally prefixed with v) or be digest-pinned. Floating tags
       like latest, stable, or java21 are rejected.
 spec:
-  validationFailureAction: Audit
+  validationFailureAction: Enforce
+  validationFailureActionOverrides:
+    - action: Audit
+      namespaces:
+        - kube-system
+        - flux-system
+        - longhorn-system
+        - monitoring
+        - crossplane-system
+        - tailscale
+        - cert-manager
+        - kyverno
+        - home-assistant
   background: true
-  failurePolicy: Ignore
+  failurePolicy: Fail
   rules:
     - name: require-image-tag
       match:
