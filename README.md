@@ -1,6 +1,6 @@
 # homelab
 
-A 3-node Kubernetes cluster running on second-hand Lenovo ThinkCentre thin clients.
+A 5-node Kubernetes cluster: three second-hand Lenovo ThinkCentre thin clients as control planes, plus two Proxmox VMs on Dell R640s as workers.
 
 Everything is GitOps. Everything is declarative. The repo is the cluster — node OS config, networking, storage, observability, auth, and workloads all live here as code and are reconciled automatically. There is no `kubectl apply` step in any normal workflow; a merge to `main` is the deploy.
 
@@ -10,18 +10,18 @@ The stack: [Talos Linux](https://www.talos.dev/) for the OS (immutable, API-driv
 
 | | |
 | --- | --- |
-| Nodes | `oak` (192.168.1.5), `maple` (192.168.1.6), `pine` (192.168.1.7) — all control plane |
+| Control plane | `oak` (192.168.1.5), `maple` (192.168.1.6), `pine` (192.168.1.7) — schedulable |
+| Workers | `birch` (192.168.1.10, `node-class: game`), `cedar` (192.168.1.11, `node-class: bulk`) — Proxmox VMs |
 | API VIP | 192.168.1.246 |
-| Talos | v1.13.2 |
-| Kubernetes | v1.36.1 |
-| CNI | Cilium 1.19.4 (kube-proxy replacement, eBPF, L2 announcements) |
-| Storage | Longhorn 1.11.2 (3 replicas, default StorageClass) |
+| Talos / Kubernetes | see `talos/talconfig.yaml` — Renovate keeps it current |
+| CNI | Cilium (kube-proxy replacement, eBPF, L2 announcements, apiserver via KubePrism) |
+| Storage | Longhorn (3 replicas, default StorageClass) |
 | Certs | cert-manager + Let's Encrypt (DNS01 via Cloudflare) |
 | DNS | ExternalDNS → Cloudflare (internal hostnames only) |
 | Ad-blocking | Blocky — LAN-wide DNS sinkhole at `192.168.1.202`; pfSense forwards all queries to it |
 | Ingress | Cilium Gateway API — internal gateway on LAN, public gateway behind cloudflared |
-| Observability | kube-prometheus-stack 85.1.3, Loki 7.0.0 single-binary, Grafana Alloy 1.8.1 DaemonSet, Hubble UI |
-| Uptime monitoring | blackbox-exporter probes 8 endpoints; alerts → Discord via Alertmanager `discord_configs` |
+| Observability | kube-prometheus-stack, Loki single-binary, Grafana Alloy DaemonSet, Hubble UI |
+| Uptime monitoring | blackbox-exporter HTTP probes; alerts → Discord via Alertmanager `discord_configs` |
 | Energy monitoring | Shelly Plug US Gen4 per-node smart plugs → Home Assistant → Prometheus → Grafana |
 | Auth | Cloudflare Access SaaS OIDC → kube-apiserver, Headlamp, and kubectl (via kubelogin) |
 | Remote access | Tailscale operator with 2 HA subnet routers advertising `192.168.1.0/24` |
@@ -33,8 +33,14 @@ The stack: [Talos Linux](https://www.talos.dev/) for the OS (immutable, API-driv
 talos/                              Talos node config via talhelper (single source of truth)
 clusters/homelab/
   flux-system/                      Flux operator + FluxInstance bootstrap
+  platform/
+    crossplane/                     Crossplane HelmRelease
+    crossplane-providers/           Cloudflare providers (dns, zone, access, zero-trust)
+    crossplane-provider-config/     ClusterProviderConfig + Cloudflare API token (SOPS)
+  cloudflare/
+    dns/                            DNS records as Crossplane CRs (email, wildcard)
   network/
-    gateway-api/                    Gateway API CRDs (pinned)
+    gateway-api.yaml                Gateway API CRDs from upstream (tag-pinned GitRepository)
     cilium/                         Cilium HelmRelease
     cilium-loadbalancer/            IP pool + L2 announcement policy
     gateway/                        Internal + public Gateway resources
@@ -45,7 +51,9 @@ clusters/homelab/
   security/
     cert-manager/                   cert-manager HelmRelease + Cloudflare token
     cert-manager-issuers/           Let's Encrypt staging + prod ClusterIssuers
-  storage/longhorn/                 Longhorn HelmRelease (+ HTTPRoute for UI)
+  storage/
+    longhorn/                       Longhorn HelmRelease (+ HTTPRoute for UI)
+    minio/                          MinIO standalone — S3 backend for Outline attachments
   observability/
     kube-prometheus-stack/          Prometheus + Alertmanager + Grafana (CF Access JWT)
     loki/                           Loki single-binary
@@ -56,12 +64,16 @@ clusters/homelab/
   system/
     kubelet-csr-approver/           Auto-approves kubelet serving CSRs
     cluster-admin-oidc/             ClusterRoleBinding (SOPS) binding CF Access user → cluster-admin
-  apps/                             Workloads (whoami, hello-public, game-2048, headlamp, home-assistant, blocky, ...)
-docs/                               Local notes; not deployed
+  apps/                             Workloads (whoami, hello-public, game-2048, headlamp,
+                                    home-assistant, blocky, outline, minecraft)
+docs/                               Local notes and plans; not tracked
 renovate.json                       Renovate config (managed by Mend's hosted GitHub App)
+.github/workflows/                  PR validation: kustomize build, kubeconform, SOPS guard
 ```
 
-Pattern: each subsystem is a directory of raw manifests with a `kustomization.yaml`, paired with a sibling `<name>.yaml` Flux Kustomization wrapper that adds `dependsOn`, SOPS `decryption`, and health checks. The root `clusters/homelab/kustomization.yaml` lists the wrappers.
+Pattern: each subsystem is a directory of raw manifests with a `kustomization.yaml`, paired with a sibling `<name>.yaml` Flux Kustomization wrapper that adds `dependsOn` and SOPS `decryption`. The root `clusters/homelab/kustomization.yaml` lists the wrappers.
+
+Wrappers set `wait: true` rather than `healthChecks`. Flux ignores `spec.healthChecks` entirely when `spec.wait` is true, so declaring both is misleading: only `wait` is doing anything, and it already checks every resource the Kustomization applies.
 
 ## Networking
 
@@ -87,7 +99,7 @@ Tag `tag:homelab` is auto-applied to managed devices; the corresponding `tagOwne
 
 [Blocky](https://github.com/0xERR0R/blocky) (`apps/blocky/`) is a LAN-wide DNS ad/tracker blocker. pfSense Unbound (`192.168.1.1`) stays the resolver every client talks to and **forwards** all queries to Blocky, which filters against blocklists and forwards clean lookups upstream to Cloudflare over DoT. Clients are untouched (DHCP still hands out pfSense); disabling Unbound's forwarding mode is an instant rollback.
 
-- 2 replicas with pod anti-affinity. DNS is served on a `LoadBalancer` Service at `192.168.1.202` (L2-announced via the `lb-announce` label), ports 53 UDP+TCP, `externalTrafficPolicy: Local`. The HTTP/metrics port is a separate ClusterIP backing a ServiceMonitor.
+- 2 replicas with pod anti-affinity and a PodDisruptionBudget (`minAvailable: 1`). DNS is served on a `LoadBalancer` Service at `192.168.1.202` (L2-announced via the `lb-announce` label), ports 53 UDP+TCP, default `externalTrafficPolicy` (`Cluster`). Do **not** set it to `Local`: Cilium's L2 lease election ignores pod placement, so a node with no local backend can win the lease, answer ARP, and blackhole every LAN DNS query. The HTTP/metrics port is a separate ClusterIP backing a ServiceMonitor.
 - Blocklists: StevenBlack + hagezi pro, plus an inline allowlist. Query logging is disabled by choice — only aggregate Prometheus metrics (block rate, query totals, cache hits) are kept, surfaced via Grafana dashboard #13768.
 - Namespace PSA is `restricted` (Blocky runs non-root and only needs `NET_BIND_SERVICE` to bind `:53`).
 
@@ -173,6 +185,10 @@ The cluster trusts **Cloudflare Access SaaS OIDC** as an identity provider end-t
 ## Secrets
 
 Encrypted with [sops](https://github.com/getsops/sops) + age. Files matching `clusters/.*/secrets/.*\.yaml` are auto-encrypted by the `.sops.yaml` rules. The age private key lives outside the repo.
+
+The `.sops.yaml` rules only apply when you actually run `sops`. Writing a plaintext Secret to one of those paths and committing it without encrypting is accepted silently by git, so CI has a job that fails on any tracked secret file lacking SOPS markers.
+
+**The age key is the cluster's single point of failure.** It decrypts `talsecret.sops.yaml`, which holds the cluster and etcd CAs; lose it and the running cluster cannot be reproduced from this repo. The key is backed up outside the repo; restore instructions are in CLAUDE.md.
 
 To edit an existing secret:
 

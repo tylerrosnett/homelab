@@ -4,30 +4,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository purpose
 
-GitOps configuration for a 3-node Talos Linux Kubernetes homelab. Flat layout — everything cluster-related lives under `clusters/homelab/` (single cluster, no need to split apps from infra across directories):
+GitOps configuration for a 5-node Talos Linux Kubernetes homelab. Flat layout — everything cluster-related lives under `clusters/homelab/` (single cluster, no need to split apps from infra across directories):
 
 - `talos/` — Talos node configuration via [talhelper](https://github.com/budimanjojo/talhelper); `talconfig.yaml` is the single source of truth.
 - `clusters/homelab/flux-system/` — Flux bootstrap (flux-operator + FluxInstance) and root Kustomizations for the `homelab` cluster.
+- `clusters/homelab/platform/` — Crossplane + the four Cloudflare providers (dns, zone, access, zero-trust) and their `ClusterProviderConfig`. Split across three Flux Kustomizations (operator → providers → provider-config) per the CRD/CR ordering pattern below.
+- `clusters/homelab/cloudflare/` — Cloudflare DNS records managed as Crossplane CRs (`dns/email.yaml` MX+DKIM+SPF, `dns/wildcard.yaml`). Note this means DNS is *partly* GitOps-managed now; the per-app internal records still come from ExternalDNS.
 - `clusters/homelab/network/` — CNI (Cilium), Gateway API CRDs, LB IP pool / L2 announce, Gateways (internal `*.ik8s` + public `*.k8s` for Cloudflare Tunnel), ExternalDNS, cloudflared, Tailscale operator + subnet-router Connectors.
 - `clusters/homelab/security/` — cert-manager + ClusterIssuers.
-- `clusters/homelab/storage/` — Longhorn (+ HTTPRoute exposing the UI internally).
+- `clusters/homelab/storage/` — Longhorn (+ HTTPRoute exposing the UI internally) and MinIO (standalone, S3 backend for Outline attachments; S3 API public at `files.tylerrosnett.com`, console internal).
 - `clusters/homelab/observability/` — kube-prometheus-stack (Prometheus, Alertmanager, Grafana), Loki single-binary, Grafana Alloy DaemonSet, Flux PodMonitor + dashboards, blackbox-exporter (uptime probes + Discord alerts), extra-dashboards (cert-manager / Cilium / Longhorn / Node Exporter Full / Loki / Blackbox / Blocky / Energy JSONs as ConfigMaps).
 - `clusters/homelab/system/` — cluster-level helpers (`kubelet-csr-approver`, `cluster-admin-oidc` for the SOPS-encrypted OIDC ClusterRoleBinding).
-- `clusters/homelab/apps/` — workload manifests (deployments, services, HTTPRoutes, NetworkPolicies). Includes `headlamp` (cluster-admin dashboard with CF Access OIDC) and `home-assistant` (smart-home hub + smart-plug energy metrics source).
-- `docs/` — local notes (e.g. `docs/superpowers/plans/`); not deployed.
-- `renovate.json` — config for the Mend-hosted Renovate GitHub App. Detects HelmRelease chart versions, OCI/HTTPS HelmRepositories, kustomize images, GHA digests, plus custom regex managers for `talosVersion:` and `kubernetesVersion:` in `talconfig.yaml`. Opens PRs only after 6pm + weekends to avoid daytime noise. Renovate maintains a "Dependency Dashboard" issue tracking everything it finds.
+- `clusters/homelab/apps/` — workload manifests (deployments, services, HTTPRoutes, NetworkPolicies): `whoami`, `hello-public`, `game-2048`, `headlamp` (cluster-admin dashboard with CF Access OIDC, **LAN-only**), `home-assistant` (smart-home hub + smart-plug energy metrics source), `blocky`, `outline`, `minecraft`.
+- `docs/` — gitignored local scratch, including the Aug 2026 remediation plans.
+- `.github/workflows/` — PR validation (kustomize build, kubeconform, SOPS-encryption guard).
+- `renovate.json` — config for the Mend-hosted Renovate GitHub App. Detects HelmRelease chart versions, OCI/HTTPS HelmRepositories, kustomize images, Crossplane provider packages, GHA digests, plus custom regex managers for `talosVersion:`/`kubernetesVersion:` in `talconfig.yaml`, the FluxInstance minor, and the flux-operator chart tag. Gateway API CRD bumps come from the flux manager watching the `gateway-api` GitRepository tag. Schedule is 6pm–5am weekdays plus weekends. **No automerge anywhere** — every PR is merged by hand on purpose. Renovate maintains a "Dependency Dashboard" issue tracking everything it finds.
 
-Each subsystem follows the pattern: a directory with raw manifests + `kustomization.yaml`, and a sibling `<name>.yaml` Flux Kustomization wrapper that adds `dependsOn`, `decryption`, and `healthChecks`. The root `clusters/homelab/kustomization.yaml` lists those wrappers.
+Each subsystem follows the pattern: a directory with raw manifests + `kustomization.yaml`, and a sibling `<name>.yaml` Flux Kustomization wrapper that adds `dependsOn` and `decryption`. The root `clusters/homelab/kustomization.yaml` lists those wrappers.
+
+**Do not add `healthChecks` to a wrapper.** Every wrapper sets `wait: true`, and Flux ignores `spec.healthChecks` entirely when `spec.wait` is true — `wait` already health-checks every resource the Kustomization applies. Declaring both reads like a cross-Kustomization ordering gate but silently is not one; use `dependsOn` for that.
 
 ## Cluster facts (don't re-derive)
 
-- Nodes: `oak` 192.168.1.5, `maple` 192.168.1.6, `pine` 192.168.1.7 — all controlplane.
-- Kubernetes API VIP: `192.168.1.246` (Talos shared VIP on eth0).
-- Talos `v1.13.2`, Kubernetes `v1.36.1`.
+- Controlplane nodes (bare metal, interface `eno1`): `oak` 192.168.1.5, `maple` 192.168.1.6, `pine` 192.168.1.7. Schedulable (`allowSchedulingOnControlPlanes: true`).
+- Worker nodes (Proxmox VMs on the R640s, `deviceSelector: driver: virtio_net`): `birch` 192.168.1.10 (`homelab/node-class: game` — minecraft pins to it), `cedar` 192.168.1.11 (`homelab/node-class: bulk`).
+- Kubernetes API VIP: `192.168.1.246` (Talos shared VIP on `eno1`).
+- **Versions live in `talos/talconfig.yaml` and Renovate bumps them — read the file, don't trust a number written here.** Note that merging a Renovate Talos/k8s PR changes only git; the rollout (`talhelper genconfig` + `talosctl upgrade`) is manual and has historically lagged.
 - CNI is `none` in Talos config — **Cilium is installed out-of-band**, so any networking work must account for Cilium being the actual CNI.
-- `kube-proxy` is disabled (Cilium kube-proxy replacement expected).
-- Install disk on every node is selected by `installDiskSelector` (`size: '>= 200GB', type: ssd`) rather than a fixed `/dev/sdX` path — block device names aren't stable across reboots when USB media is present. System extensions enabled: `iscsi-tools`, `util-linux-tools`.
+- `kube-proxy` is disabled (Cilium kube-proxy replacement expected). Cilium reaches the apiserver via **KubePrism** (`localhost:7445`), not the VIP: Talos moves the VIP on etcd health, not apiserver health, so a node with healthy etcd and a sick apiserver could otherwise stall every agent.
+- Install disk on every node is selected by `installDiskSelector` (`size: '>= 200GB', type: ssd`) rather than a fixed `/dev/sdX` path — block device names aren't stable across reboots when USB media is present. Proxmox virtual disks need "SSD emulation" ticked for `type: ssd` to match. System extensions: `iscsi-tools`, `util-linux-tools` everywhere, plus `qemu-guest-agent` on workers.
 - Kubelet uses `rotate-server-certificates: true`.
+- The apiserver audit policy logs Secrets at **`Metadata`** level, deliberately. `RequestResponse` would write every SOPS-decrypted value Flux applies into the node audit log in plaintext — and Alloy tails that log into Loki. Don't raise it.
 
 ## Common commands
 
@@ -107,6 +114,9 @@ DNS for public apps relies on the wildcard CNAME `*.tylerrosnett.com → <tunnel
 - **Sidecar-provisioned dashboard JSONs must define a `DS_PROMETHEUS` datasource template variable** in `templating.list` (`type: datasource, query: prometheus, hide: 2`). Provisioning does NOT substitute the `__inputs` block, so panels referencing `${DS_PROMETHEUS}` without the variable fail with "datasource not found" on every panel. See any existing JSON in `extra-dashboards/dashboards/` for the pattern.
 - **Talos kube-controller-manager + kube-scheduler must bind on 0.0.0.0** for Prometheus to scrape them. Default Talos binds to 127.0.0.1 only. Fix lives at `talos/patches/cluster-scheduler-controller-bind.yaml`. Symptom of missing this: perpetual `KubeSchedulerInstanceUnreachable` / `KubeControllerManagerInstanceUnreachable` / `TargetDown` alerts even with KPS's port overrides set.
 - **Prometheus + Alertmanager `externalUrl`** are set to `https://{prometheus,alertmanager}.internal.tylerrosnett.com`. Without these, "Source" links in Alertmanager UI and `generatorURL` in alert payloads default to in-cluster service DNS (`kube-prometheus-stack-prometheus.monitoring:9090`) which doesn't resolve outside the cluster.
+- **Loki retention is compactor-based** (`loki.compactor.retention_enabled: true` + `delete_request_store: filesystem` + `limits_config.retention_period: 30d`). Loki refuses to start with retention enabled and no delete-request store. Without retention the 50Gi PVC grows until ingestion stops, silently.
+- **ServiceMonitors default to OFF in the Loki, Longhorn and cert-manager charts** and are explicitly enabled in each HelmRelease. If a provisioned dashboard is permanently empty, check that first. cert-manager's values key is lowercase `prometheus.servicemonitor.enabled` — the camelCase spelling silently does nothing.
+- **Prometheus sets both `retention: 14d` and `retentionSize: "45GiB"`** on a 50Gi PVC. The size backstop matters because time-based retention alone won't save you from a scrape-volume spike.
 - **Longhorn manager restart-count cleanup is dangerous.** Deleting a `longhorn-manager` pod triggers an optimistic-concurrency race on Setting CR updates at startup (`Operation cannot be fulfilled on settings.longhorn.io "default-replica-count"`), which keeps fatal-exiting until contention settles. Symptom is a pod that keeps restarting after a clean delete. Resolution is to leave it alone or delete all longhorn-managers + driver-deployer together so they re-elect cleanly. Don't try to zero out their restart counts.
 
 ## OIDC auth (Cloudflare Access SaaS)
@@ -173,9 +183,10 @@ Gotchas (don't re-derive):
 
 `observability/blackbox-exporter/` owns the uptime side end-to-end:
 
-- **`prometheus-blackbox-exporter`** HelmRelease (community chart 11.10.0) with `http_2xx`, `http_2xx_insecure`, `tcp_connect` modules. ServiceMonitor enabled with `release: kube-prometheus-stack` label for KPS discovery.
-- **`Probe` CRDs** in `probes.yaml` — split into `public-endpoints` (3 URLs) and `internal-endpoints` (5 URLs), 60s interval. Add targets to the static list; don't add new Probe resources unless you need different modules/labels.
-- **`PrometheusRule`** in `rules.yaml` with 4 alerts: `EndpointDown`, `EndpointSlow`, `CertExpiringSoon`, `CertExpired`. All use `severity: warning|critical`.
+- **`prometheus-blackbox-exporter`** HelmRelease (community chart; version lives in the HelmRelease, Renovate bumps it) with `http_2xx`, `http_2xx_insecure`, `tcp_connect` modules. ServiceMonitor enabled with `release: kube-prometheus-stack` label for KPS discovery. This repo's `http_2xx` accepts `[200, 301, 302, 401, 403]`, which is why probing an endpoint that 403s on `GET /` (e.g. MinIO's S3 API at `files.tylerrosnett.com`) is safe rather than a permanent false alarm.
+- **`Probe` CRDs** in `probes.yaml` — split into `public-endpoints` and `internal-endpoints`, 60s interval. Add targets to the static list; don't add new Probe resources unless you need different modules/labels.
+- **`PrometheusRule`** in `rules.yaml` with 4 alerts: `EndpointDown`, `EndpointSlow`, `CertExpiringSoon`, `CertExpired`. All use `severity: warning|critical`. `CertExpiringSoon` is bounded to `> 0 and < 14d` so it doesn't swallow `CertExpired`. Note `CertExpired` still can't fire under `http_2xx`: an expired cert fails the handshake, so `probe_ssl_earliest_cert_expiry` stops being reported instead of going negative, and `EndpointDown` fires. Switching those probes to `http_2xx_insecure` would be the real fix.
+- **Platform alerts** live separately in `observability/kube-prometheus-stack/prometheusrule-platform.yaml` (Flux reconcile failures, Longhorn volume health, cert-manager renewal, Loki). **Flux exports no `gotk_resource_info` or `gotk_reconcile_condition`** — the controllers only emit `gotk_reconcile_duration_seconds` and `controller_runtime_*`, so alerts there are built on `controller_runtime_reconcile_total{result="error"}` and `up`. Resource-state metrics would need kube-state-metrics `customResourceState` config, which doesn't exist here (that's also why `flux-monitoring/dashboards/cluster.json` renders empty).
 - **`AlertmanagerConfig`** in `alertmanagerconfig.yaml` — single route with `severity =~ warning|critical` matcher routes to a `discord_configs` receiver. Webhook URL pulled from `secrets/discord-webhook.sops.yaml` via `apiURL.name/key` Secret ref.
 - KPS values set `alertmanagerConfigSelector: { matchLabels: { alertmanagerConfig: discord } }` so the operator picks up the CRD. Required — by default KPS's selector matches nothing.
 - **Watchdog is suppressed** by the severity matcher (it's `severity: none`). Don't broaden the matcher or Discord gets a heartbeat ping every 30s.
