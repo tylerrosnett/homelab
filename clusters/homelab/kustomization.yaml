@@ -13,6 +13,8 @@ resources:
   - network/cilium-loadbalancer.yaml
   - security/cert-manager.yaml
   - security/cert-manager-issuers.yaml
+  - security/kyverno.yaml
+  - security/kyverno-policies.yaml
   - network/gateway.yaml
   - network/external-dns.yaml
   - network/cloudflare-tunnel.yaml

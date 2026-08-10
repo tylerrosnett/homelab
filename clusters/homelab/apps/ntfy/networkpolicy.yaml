@@ -1,0 +1,18 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: ntfy-ingress
+  namespace: ntfy
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ntfy
+  ingress:
+    - fromEntities:
+        - ingress
+        - host
+        - remote-node
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: prometheus
+            io.kubernetes.pod.namespace: monitoring

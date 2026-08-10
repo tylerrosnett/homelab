@@ -1,0 +1,21 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: kyverno
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: kube-prometheus-stack
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/homelab/security/kyverno
+  prune: true
+  wait: true

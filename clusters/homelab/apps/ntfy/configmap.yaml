@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ntfy-config
+  namespace: ntfy
+data:
+  server.yml: |
+    base-url: https://ntfy.tylerrosnett.com
+    upstream-base-url: https://ntfy.sh
+    listen-http: ":8080"
+    behind-proxy: true
+    auth-file: /var/lib/ntfy/user.db
+    auth-default-access: deny-all
+    cache-file: /var/lib/ntfy/cache.db
+    metrics-listen-http: ":9090"

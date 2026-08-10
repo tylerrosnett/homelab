@@ -1,0 +1,63 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-pinned-images
+  annotations:
+    policies.kyverno.io/title: Require Pinned Images
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Images must specify a tag that looks like a pinned version (leading
+      digit, optionally prefixed with v) or be digest-pinned. Floating tags
+      like latest, stable, or java21 are rejected.
+spec:
+  validationFailureAction: Audit
+  background: true
+  failurePolicy: Ignore
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "An explicit image tag is required."
+        foreach:
+          - list: "request.object.spec.containers"
+            pattern:
+              image: "*:*"
+          - list: "request.object.spec.initContainers"
+            pattern:
+              image: "*:*"
+    - name: require-version-like-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: >-
+          Image tag must look like a pinned version (for example v2.27.0 or
+          2025.1.0) or be digest-pinned. Floating tags are not allowed.
+        foreach:
+          - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                all:
+                  - key: "{{ regex_match(':v?[0-9][^/]*$', element.image) }}"
+                    operator: Equals
+                    value: false
+                  - key: "{{ contains(element.image, '@sha256:') }}"
+                    operator: Equals
+                    value: false
+          - list: "request.object.spec.initContainers"
+            deny:
+              conditions:
+                all:
+                  - key: "{{ regex_match(':v?[0-9][^/]*$', element.image) }}"
+                    operator: Equals
+                    value: false
+                  - key: "{{ contains(element.image, '@sha256:') }}"
+                    operator: Equals
+                    value: false

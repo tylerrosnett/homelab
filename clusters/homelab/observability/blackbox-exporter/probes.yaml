@@ -17,6 +17,7 @@ spec:
         - https://2048.tylerrosnett.com
         - https://outline.tylerrosnett.com
         - https://files.tylerrosnett.com
+        - https://ntfy.tylerrosnett.com
       labels:
         category: public
 ---

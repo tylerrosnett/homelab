@@ -11,11 +11,11 @@ GitOps configuration for a 5-node Talos Linux Kubernetes homelab. Flat layout �
 - `clusters/homelab/platform/` — Crossplane + the four Cloudflare providers (dns, zone, access, zero-trust) and their `ClusterProviderConfig`. Split across three Flux Kustomizations (operator → providers → provider-config) per the CRD/CR ordering pattern below.
 - `clusters/homelab/cloudflare/` — Cloudflare DNS records managed as Crossplane CRs (`dns/email.yaml` MX+DKIM+SPF, `dns/wildcard.yaml`). Note this means DNS is *partly* GitOps-managed now; the per-app internal records still come from ExternalDNS.
 - `clusters/homelab/network/` — CNI (Cilium), Gateway API CRDs, LB IP pool / L2 announce, Gateways (internal `*.ik8s` + public `*.k8s` for Cloudflare Tunnel), ExternalDNS, cloudflared, Tailscale operator + subnet-router Connectors.
-- `clusters/homelab/security/` — cert-manager + ClusterIssuers.
+- `clusters/homelab/security/` — cert-manager + ClusterIssuers, Kyverno (operator + audit-mode policies, split into two Flux Kustomizations per the CRD/CR ordering pattern below).
 - `clusters/homelab/storage/` — Longhorn (+ HTTPRoute exposing the UI internally) and MinIO (standalone, S3 backend for Outline attachments; S3 API public at `files.tylerrosnett.com`, console internal).
 - `clusters/homelab/observability/` — kube-prometheus-stack (Prometheus, Alertmanager, Grafana), Loki single-binary, Grafana Alloy DaemonSet, Flux PodMonitor + dashboards, blackbox-exporter (uptime probes + Discord alerts), extra-dashboards (cert-manager / Cilium / Longhorn / Node Exporter Full / Loki / Blackbox / Blocky / Energy JSONs as ConfigMaps).
 - `clusters/homelab/system/` — cluster-level helpers (`kubelet-csr-approver`, `cluster-admin-oidc` for the SOPS-encrypted OIDC ClusterRoleBinding).
-- `clusters/homelab/apps/` — workload manifests (deployments, services, HTTPRoutes, NetworkPolicies): `whoami`, `hello-public`, `game-2048`, `headlamp` (cluster-admin dashboard with CF Access OIDC, **LAN-only**), `home-assistant` (smart-home hub + smart-plug energy metrics source), `blocky`, `outline`, `minecraft`.
+- `clusters/homelab/apps/` — workload manifests (deployments, services, HTTPRoutes, NetworkPolicies): `whoami`, `hello-public`, `game-2048`, `headlamp` (cluster-admin dashboard with CF Access OIDC, **LAN-only**), `home-assistant` (smart-home hub + smart-plug energy metrics source), `blocky`, `outline`, `minecraft`, `ntfy` (public push notifications at `ntfy.tylerrosnett.com`, deny-all auth with SOPS-provisioned users/tokens, `upstream-base-url` pointed at ntfy.sh for iOS delivery).
 - `docs/` — gitignored local scratch, including the Aug 2026 remediation plans.
 - `.github/workflows/` — PR validation (kustomize build, kubeconform, SOPS-encryption guard).
 - `renovate.json` — config for the Mend-hosted Renovate GitHub App. Detects HelmRelease chart versions, OCI/HTTPS HelmRepositories, kustomize images, Crossplane provider packages, GHA digests, plus custom regex managers for `talosVersion:`/`kubernetesVersion:` in `talconfig.yaml`, the FluxInstance minor, and the flux-operator chart tag. Gateway API CRD bumps come from the flux manager watching the `gateway-api` GitRepository tag. Schedule is 6pm–5am weekdays plus weekends. **No automerge anywhere** — every PR is merged by hand on purpose. Renovate maintains a "Dependency Dashboard" issue tracking everything it finds.
@@ -136,6 +136,16 @@ The cluster trusts a single Cloudflare Access SaaS OIDC application for all inte
 
 When adding a new app that should be behind CF Access (rather than just LAN-only), prefer reusing the existing SaaS app's client ID by adding a new redirect URL, or create a new SaaS app if isolation matters. Either way: PKCE on, JWT scope `openid email profile groups offline_access` (refresh tokens are enabled on the existing SaaS app).
 
+## Kyverno admission policy
+
+`security/kyverno/` (operator, CRDs) and `security/kyverno-policies/` (prebuilt Pod Security Standards `restricted` set + 4 custom ClusterPolicies) are two Flux Kustomizations per the CRD/CR ordering pattern. **Everything runs `validationFailureAction: Audit` with `failurePolicy: Ignore` — nothing blocks admission.** Violations land in PolicyReports: `kubectl get polr -A` (namespaced) and `kubectl get cpolr` (cluster-scoped, where the Namespace-targeted policy reports).
+
+- Custom policies: `require-pinned-images` (tag must match `:v?[0-9]...` or be digest-pinned; heuristic), `require-probes` (any one of liveness/readiness/startup — faithful copy of the upstream policy, deliberately looser than "readiness and liveness"), `require-requests` (CPU + memory requests), `require-cnp-in-public-namespaces` (background apiCall scan; report-only by nature since the namespace exists before its CNP).
+- The apiCall policy depends on the `cilium.io` RBAC `extraResources` set on **both** admissionController and reportsController in the operator HelmRelease. Removing it makes background scans silently error.
+- Six namespaces carry `expose-public: "true"` and are in the CNP policy's scope: hello-public, game-2048, outline, minio, monitoring, ntfy.
+- Expected audit violators, all deliberate: home-assistant (loose on purpose), monitoring's node-exporter, longhorn-system, assorted chart-managed jobs.
+- **Enforce flip order, per policy:** zero FAILs in reports → set `admissionController.replicas: 3` (a single replica with a failing-closed webhook blocks all admission when its pod dies) → flip the policy (`spec.validationFailureAction: Enforce` + `spec.failurePolicy: Fail` for custom; `validationFailureActionByPolicy` for PSS) → exempt accepted violators via `validationFailureActionOverrides`.
+
 ## Tailscale subnet router
 
 `network/tailscale/` (operator + CRD install) and `network/tailscale-connectors/` (Connector CRs) are split into two Flux Kustomizations because the Connector CRD is installed by the operator's chart — CRs can't be reconciled before the CRD exists. `tailscale-connectors` has `dependsOn: tailscale`.
@@ -178,6 +188,16 @@ Gotchas (don't re-derive):
 - ServiceMonitor lives in the `home-assistant` namespace because **the bearer-token Secret must be in the same namespace as the ServiceMonitor** (prometheus-operator constraint). Token is an HA long-lived access token, SOPS-encrypted at `apps/home-assistant/secrets/prometheus-token.sops.yaml`.
 - The Service needs `labels: app: home-assistant` — ServiceMonitors select Services by label, and the original Service had none.
 - Plugs are set to power-on default "On" and front-button lock (they feed cluster nodes/router); their `switch.*` entities are disabled in HA so nothing can toggle them. Factory reset: hold button 10s **within 60s of plug-in**.
+
+## ntfy push notifications
+
+`apps/ntfy/` runs [ntfy](https://ntfy.sh) publicly at `ntfy.tylerrosnett.com` (cf-tunnel). Nothing in-cluster publishes to it yet — Discord keeps the Alertmanager traffic.
+
+- **Auth is deny-all** with users/tokens provisioned declaratively from the SOPS secret via `NTFY_AUTH_USERS` / `NTFY_AUTH_TOKENS` env vars (`user:bcrypt-hash:role` / `user:token[:label]`). Provisioned tokens must be `tk_` + 29 lowercase alphanumerics. Generate the hash with `podman run --rm -it docker.io/binwiederhier/ntfy:v2.27.0 user hash` (the `user` command exists only in the Linux server build — macOS brew ntfy is client-only).
+- **Credential rotation needs `kubectl -n ntfy rollout restart deploy/ntfy`** — nothing annotates the Deployment with a secret checksum, so editing the SOPS file alone changes nothing in the running pod.
+- `upstream-base-url: https://ntfy.sh` is required for iOS delivery: ntfy.sh relays a wake-up through APNS, then the phone fetches the message from this server.
+- The CNP allows the gateway entities plus a `fromEndpoints` rule for Prometheus. Any future in-cluster publisher (e.g. Alertmanager) needs its own `fromEndpoints` rule — `fromEntities` alone drops pod-to-pod traffic (the MinIO helper-job lesson).
+- Deployment uses `strategy: Recreate` (RWO Longhorn PVC) — same RollingUpdate deadlock avoidance as Grafana.
 
 ## Uptime monitoring and Discord alerts
 

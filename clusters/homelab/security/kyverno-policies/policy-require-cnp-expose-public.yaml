@@ -1,0 +1,41 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-cnp-in-public-namespaces
+  annotations:
+    policies.kyverno.io/title: Require CiliumNetworkPolicy in Public Namespaces
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Namespace
+    policies.kyverno.io/description: >-
+      Namespaces labeled expose-public "true" are reachable through cf-tunnel
+      and must contain a CiliumNetworkPolicy restricting ingress. Standard
+      NetworkPolicy does not match Cilium's envoy-on-hostNetwork traffic.
+spec:
+  validationFailureAction: Audit
+  background: true
+  failurePolicy: Ignore
+  rules:
+    - name: require-cnp
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              selector:
+                matchLabels:
+                  expose-public: "true"
+      context:
+        - name: cnpCount
+          apiCall:
+            urlPath: "/apis/cilium.io/v2/namespaces/{{ request.object.metadata.name }}/ciliumnetworkpolicies"
+            jmesPath: "items | length(@)"
+      validate:
+        message: >-
+          Publicly exposed namespaces must contain a CiliumNetworkPolicy.
+          See apps/hello-public/networkpolicy.yaml for the template.
+        deny:
+          conditions:
+            all:
+              - key: "{{ cnpCount }}"
+                operator: Equals
+                value: 0
