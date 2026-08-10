@@ -41,6 +41,15 @@ spec:
           enabled: true
           storageClass: longhorn
           size: 5Gi
+        # Overrides the chart's "nano" resourcesPreset (150m CPU / 192Mi limits),
+        # which throttled postgres in ~54% of scheduling periods. No CPU limit on
+        # purpose — throttling a single-tenant DB buys nothing.
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
     redis:
       enabled: true
       auth:
@@ -50,6 +59,13 @@ spec:
           enabled: true
           storageClass: longhorn
           size: 2Gi
+        # Same nano-preset escape as postgres; no CPU limit.
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
     fileStorage:
       mode: s3
       s3:
