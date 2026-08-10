@@ -1,0 +1,99 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: flux.rules
+      rules:
+        # Flux 2.8 controllers no longer export gotk_reconcile_condition or
+        # gotk_suspend_status (only gotk_reconcile_duration_seconds), and this
+        # cluster has no kube-state-metrics customResourceState config, so
+        # gotk_resource_info does not exist either. controller-runtime's
+        # reconcile counter is the only per-resource-health signal available
+        # from the flux-system PodMonitor.
+        - alert: FluxReconciliationFailing
+          expr: sum by (controller) (rate(controller_runtime_reconcile_total{namespace="flux-system", result="error"}[5m])) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Flux {{ $labels.controller }} reconciliations are failing"
+            description: "The Flux {{ $labels.controller }} controller has returned reconcile errors continuously for 15+ minutes ({{ $value | humanize }} errors/sec). Run `flux get all -A --status-selector ready=false` to find the unhealthy resource."
+        - alert: FluxControllerDown
+          expr: up{namespace="flux-system"} == 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Flux controller {{ $labels.pod }} is not being scraped"
+            description: "Prometheus has failed to scrape {{ $labels.pod }} in flux-system for 15+ minutes. GitOps reconciliation may be stopped."
+    - name: longhorn.rules
+      rules:
+        # longhorn_volume_robustness is label-based in Longhorn 1.11+: one
+        # series per state (unknown/healthy/degraded/faulted) valued 1 for the
+        # current state and 0 otherwise. It is NOT an enum-valued gauge.
+        - alert: LonghornVolumeDegraded
+          expr: longhorn_volume_robustness{state="degraded"} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Longhorn volume {{ $labels.volume }} is degraded"
+            description: "Volume {{ $labels.volume }} (PVC {{ $labels.pvc_namespace }}/{{ $labels.pvc }}) has been degraded for 10+ minutes — one or more replicas are missing or rebuilding."
+        - alert: LonghornVolumeFaulted
+          expr: longhorn_volume_robustness{state="faulted"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn volume {{ $labels.volume }} is FAULTED"
+            description: "Volume {{ $labels.volume }} (PVC {{ $labels.pvc_namespace }}/{{ $labels.pvc }}) has no healthy replicas and is unusable. Data loss is possible."
+        - alert: LonghornNodeStorageHigh
+          expr: 100 * sum by (node) (longhorn_node_storage_usage_bytes) / sum by (node) (longhorn_node_storage_capacity_bytes > 0) > 85
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Longhorn storage on node {{ $labels.node }} is {{ $value | printf \"%.1f\" }}% full"
+            description: "Node {{ $labels.node }} has used {{ $value | printf \"%.1f\" }}% of its Longhorn storage for 15+ minutes. New replicas will stop scheduling once it fills."
+    - name: cert-manager.rules
+      rules:
+        - alert: CertManagerCertificateNotReady
+          expr: certmanager_certificate_ready_status{condition="False"} == 1
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} is not ready"
+            description: "cert-manager reports Certificate {{ $labels.namespace }}/{{ $labels.name }} (issuer {{ $labels.issuer_kind }}/{{ $labels.issuer_name }}) in a non-Ready state for 1+ hour."
+        # cert-manager renews at 30 days remaining; the blackbox CertExpiringSoon
+        # alert only fires at 14. This closes the silent gap in between.
+        - alert: CertManagerCertificateExpiringSoon
+          expr: certmanager_certificate_expiration_timestamp_seconds - time() < 21 * 86400
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in < 21 days"
+            description: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in {{ $value | humanizeDuration }} and cert-manager has not renewed it (renewal is due at 30 days remaining)."
+    - name: loki.rules
+      rules:
+        - alert: LokiPanicking
+          expr: increase(loki_panic_total[10m]) > 0
+          labels:
+            severity: critical
+          annotations:
+            summary: "Loki panicked on {{ $labels.pod }}"
+            description: "Loki recovered from {{ $value | humanize }} panic(s) in the last 10 minutes on {{ $labels.pod }}. Log ingestion or querying may be impaired."
+        - alert: LokiDiscardingSamples
+          expr: sum by (reason) (rate(loki_discarded_samples_total[5m])) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Loki is discarding log samples (reason: {{ $labels.reason }})"
+            description: "Loki has been discarding {{ $value | humanize }} samples/sec for 15+ minutes with reason `{{ $labels.reason }}`. Logs are being dropped before they reach storage."

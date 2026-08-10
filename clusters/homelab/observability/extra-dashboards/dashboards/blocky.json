@@ -2101,6 +2101,7 @@
           "text": "Default",
           "value": "default"
         },
+        "hide": 2,
         "label": "datasource",
         "name": "DS_PROMETHEUS",
         "options": [],

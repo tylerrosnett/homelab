@@ -34,3 +34,7 @@ spec:
       replicaCount: 2
     cainjector:
       replicaCount: 2
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: true

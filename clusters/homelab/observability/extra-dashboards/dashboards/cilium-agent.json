@@ -11152,6 +11152,7 @@
     "list": [
       {
         "current": {},
+        "hide": 2,
         "includeAll": false,
         "label": "Prometheus",
         "name": "DS_PROMETHEUS",

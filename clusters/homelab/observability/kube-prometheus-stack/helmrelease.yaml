@@ -46,6 +46,7 @@ spec:
       prometheusSpec:
         externalUrl: https://prometheus.internal.tylerrosnett.com
         retention: 14d
+        retentionSize: "45GiB"
         podMonitorSelectorNilUsesHelmValues: false
         serviceMonitorSelectorNilUsesHelmValues: false
         probeSelectorNilUsesHelmValues: false

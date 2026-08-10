@@ -8,3 +8,4 @@ resources:
   - grafana-networkpolicy.yaml
   - prometheus-httproute.yaml
   - alertmanager-httproute.yaml
+  - prometheusrule-platform.yaml

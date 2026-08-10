@@ -26,7 +26,7 @@ spec:
             summary: "Endpoint {{ $labels.instance }} is slow"
             description: "{{ $labels.instance }} response time > 5s for 10+ minutes (currently {{ $value | humanizeDuration }})."
         - alert: CertExpiringSoon
-          expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 14
+          expr: probe_ssl_earliest_cert_expiry - time() > 0 and probe_ssl_earliest_cert_expiry - time() < 86400 * 14
           for: 1h
           labels:
             severity: warning

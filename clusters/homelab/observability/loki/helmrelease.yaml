@@ -36,6 +36,14 @@ spec:
             index:
               prefix: loki_index_
               period: 24h
+      limits_config:
+        retention_period: 30d
+      compactor:
+        retention_enabled: true
+        delete_request_store: filesystem
+    monitoring:
+      serviceMonitor:
+        enabled: true
     singleBinary:
       replicas: 1
       persistence:

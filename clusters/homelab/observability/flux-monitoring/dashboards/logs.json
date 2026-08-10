@@ -306,7 +306,7 @@
           "text": "Loki",
           "value": "Loki"
         },
-        "hide": 0,
+        "hide": 2,
         "includeAll": false,
         "label": "Datasource",
         "multi": false,

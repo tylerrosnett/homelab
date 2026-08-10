@@ -2394,6 +2394,7 @@
     "list": [
       {
         "current": {},
+        "hide": 2,
         "includeAll": false,
         "label": "Datasource",
         "name": "datasource",
