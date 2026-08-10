@@ -3,4 +3,5 @@ kind: Namespace
 metadata:
   name: headlamp
   labels:
-    expose-public: "true"
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
