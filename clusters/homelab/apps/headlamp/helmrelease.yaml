@@ -4,6 +4,8 @@ metadata:
   name: headlamp
   namespace: headlamp
 spec:
+  driftDetection:
+    mode: enabled
   interval: 30m
   chart:
     spec:

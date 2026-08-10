@@ -4,6 +4,8 @@ metadata:
   name: crossplane
   namespace: crossplane-system
 spec:
+  driftDetection:
+    mode: enabled
   interval: 30m
   chart:
     spec:

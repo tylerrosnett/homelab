@@ -4,6 +4,8 @@ metadata:
   name: external-dns
   namespace: external-dns
 spec:
+  driftDetection:
+    mode: enabled
   interval: 30m
   chart:
     spec:

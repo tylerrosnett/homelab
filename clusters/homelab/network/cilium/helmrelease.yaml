@@ -4,6 +4,8 @@ metadata:
   name: cilium
   namespace: kube-system
 spec:
+  driftDetection:
+    mode: enabled
   interval: 30m
   chart:
     spec:

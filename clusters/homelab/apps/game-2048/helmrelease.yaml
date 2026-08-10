@@ -4,6 +4,8 @@ metadata:
   name: game-2048
   namespace: game-2048
 spec:
+  driftDetection:
+    mode: enabled
   interval: 30m
   chart:
     spec:
