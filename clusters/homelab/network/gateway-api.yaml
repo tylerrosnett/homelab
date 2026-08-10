@@ -1,3 +1,20 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: gateway-api
+  namespace: flux-system
+spec:
+  interval: 12h
+  url: https://github.com/kubernetes-sigs/gateway-api
+  ref:
+    # Renovate's flux manager bumps this tag (git-tags datasource). Merging the PR
+    # applies the new CRD schemas directly — no vendoring step.
+    tag: v1.6.1
+  ignore: |
+    # artifact only needs the CRD kustomization
+    /*
+    !/config/crd/
+---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -9,7 +26,9 @@ spec:
   timeout: 5m
   sourceRef:
     kind: GitRepository
-    name: flux-system
-  path: ./clusters/homelab/network/gateway-api
-  prune: true
+    name: gateway-api
+  path: ./config/crd
+  # prune stays off: pruning a Gateway API CRD cascade-deletes every Gateway and
+  # HTTPRoute in the cluster. Worst case with prune off is an obsolete CRD lingering.
+  prune: false
   wait: true

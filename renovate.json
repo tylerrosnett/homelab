@@ -84,6 +84,16 @@
       "matchDepNames": ["kubernetes/kubernetes"],
       "matchUpdateTypes": ["minor", "major"],
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Gateway API CRDs come straight from the upstream repo via the gateway-api GitRepository",
+      "matchDatasources": ["git-tags"],
+      "matchPackageNames": ["https://github.com/kubernetes-sigs/gateway-api"],
+      "labels": ["dependencies", "gateway-api"],
+      "prBodyNotes": [
+        "Merging applies the new CRD schemas directly — Flux fetches the tag and reconciles `config/crd`.",
+        "Before merging a minor: confirm the installed Cilium supports this Gateway API version (Cilium docs → Gateway API support)."
+      ]
     }
   ],
   "customManagers": [
