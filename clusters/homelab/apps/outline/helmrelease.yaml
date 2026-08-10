@@ -33,6 +33,11 @@ spec:
       enabled: false
     postgresql:
       enabled: true
+      # Pin the subchart's bitnamilegacy image (chart default is :latest, a
+      # floating tag on a database). Same 17.5 minor as the running server —
+      # never bump the major here without a pg_upgrade plan.
+      image:
+        tag: 17.5.0-debian-12-r20
       auth:
         username: outline
         database: outline
@@ -52,6 +57,9 @@ spec:
             memory: 1Gi
     redis:
       enabled: true
+      # Same :latest-default pin as postgres; 8.0.3 is the running version.
+      image:
+        tag: 8.0.3-debian-12-r3
       auth:
         enabled: false
       master:
