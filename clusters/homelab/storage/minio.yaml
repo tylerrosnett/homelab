@@ -4,6 +4,9 @@ metadata:
   name: minio
   namespace: flux-system
 spec:
+  dependsOn:
+    - name: gateway
+    - name: longhorn
   decryption:
     provider: sops
     secretRef:
@@ -17,8 +20,3 @@ spec:
   path: ./clusters/homelab/storage/minio
   prune: true
   wait: true
-  healthChecks:
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: minio
-      namespace: storage

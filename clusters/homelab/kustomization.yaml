@@ -18,7 +18,7 @@ resources:
   - network/cloudflare-tunnel.yaml
   - network/tailscale.yaml
   - network/tailscale-connectors.yaml
-  - storage/longhorn
+  - storage/longhorn.yaml
   - storage/minio.yaml
   - observability/kube-prometheus-stack.yaml
   - observability/loki.yaml
@@ -26,4 +26,4 @@ resources:
   - observability/flux-monitoring.yaml
   - observability/extra-dashboards.yaml
   - observability/blackbox-exporter.yaml
-  - apps
+  - apps.yaml

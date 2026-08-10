@@ -6,7 +6,7 @@ metadata:
 spec:
   dependsOn:
     - name: gateway
-    - name: cloudflare-tunnel
+    - name: longhorn   # Prometheus / Alertmanager / Grafana PVCs
   interval: 10m
   retryInterval: 1m
   timeout: 15m
@@ -16,8 +16,3 @@ spec:
   path: ./clusters/homelab/observability/kube-prometheus-stack
   prune: true
   wait: true
-  healthChecks:
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: kube-prometheus-stack
-      namespace: monitoring

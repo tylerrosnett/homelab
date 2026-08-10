@@ -1,21 +1,17 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cloudflare-tunnel
+  name: longhorn
   namespace: flux-system
 spec:
   dependsOn:
     - name: gateway
-  decryption:
-    provider: sops
-    secretRef:
-      name: sops-age
   interval: 10m
   retryInterval: 1m
-  timeout: 5m
+  timeout: 15m
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./clusters/homelab/network/cloudflare-tunnel
+  path: ./clusters/homelab/storage/longhorn
   prune: true
   wait: true
