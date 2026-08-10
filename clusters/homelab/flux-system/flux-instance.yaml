@@ -8,7 +8,7 @@ metadata:
     fluxcd.controlplane.io/reconcileTimeout: "5m"
 spec:
   distribution:
-    version: "2.8.x"
+    version: "2.9.x"
     registry: "ghcr.io/fluxcd"
   components:
     - source-controller
