@@ -29,6 +29,12 @@ spec:
             value:
               - CREATE
               - UPDATE
+          # Job and CronJob pods are batch workloads; probes make no sense on
+          # them and requiring them would deny every helper/hook job.
+          - key: "{{ request.object.metadata.ownerReferences[0].kind || 'none' }}"
+            operator: AnyNotIn
+            value:
+              - Job
       validate:
         message: "Liveness, readiness, or startup probes are required for all containers."
         foreach:

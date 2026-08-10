@@ -44,6 +44,41 @@ spec:
       capabilities:
         drop:
           - ALL
+    postJob:
+      securityContext:
+        enabled: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+    makeBucketJob:
+      securityContext:
+        enabled: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+    makeUserJob:
+      securityContext:
+        enabled: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
     buckets:
       - name: outline
         policy: none
