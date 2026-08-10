@@ -1,0 +1,6 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-cloudflare-cloudflare
+spec:
+  package: xpkg.upbound.io/wildbitca/provider-cloudflare-cloudflare:v0.2.5

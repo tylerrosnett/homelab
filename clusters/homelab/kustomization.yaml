@@ -8,6 +8,7 @@ resources:
   - platform/crossplane-providers.yaml
   - platform/crossplane-provider-config.yaml
   - cloudflare/dns.yaml
+  - cloudflare/rulesets.yaml
   - network/gateway-api.yaml
   - network/cilium.yaml
   - network/cilium-loadbalancer.yaml

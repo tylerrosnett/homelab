@@ -5,3 +5,4 @@ resources:
   - provider-cloudflare-zone.yaml
   - provider-cloudflare-access.yaml
   - provider-cloudflare-zero.yaml
+  - provider-cloudflare-cloudflare.yaml

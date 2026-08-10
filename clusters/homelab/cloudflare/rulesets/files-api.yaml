@@ -1,0 +1,20 @@
+apiVersion: cloudflare.upjet-cloudflare.m.upbound.io/v1alpha1
+kind: Ruleset
+metadata:
+  name: files-admin-block
+  namespace: cloudflare
+spec:
+  forProvider:
+    zoneId: 44d494598f8397dcf5b600cc3c41455c
+    name: files-admin-block
+    description: Block the MinIO admin API from the internet
+    kind: zone
+    phase: http_request_firewall_custom
+    rules:
+      - action: block
+        description: files.tylerrosnett.com serves S3 only; /minio/admin is the management API
+        expression: '(http.host eq "files.tylerrosnett.com" and starts_with(http.request.uri.path, "/minio/admin"))'
+        enabled: true
+  providerConfigRef:
+    kind: ClusterProviderConfig
+    name: default
