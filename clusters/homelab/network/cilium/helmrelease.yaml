@@ -24,8 +24,11 @@ spec:
   values:
     rollOutCiliumPods: true
     kubeProxyReplacement: true
-    k8sServiceHost: 192.168.1.246
-    k8sServicePort: 6443
+    # KubePrism (Talos default, :7445) load-balances across all healthy apiservers per node.
+    # The VIP is a single floating endpoint that Talos moves on etcd health, not apiserver
+    # health, so a node with healthy etcd but a sick apiserver can hold it and stall Cilium.
+    k8sServiceHost: localhost
+    k8sServicePort: 7445
     gatewayAPI:
       enabled: true
       xffNumTrustedHops: 1

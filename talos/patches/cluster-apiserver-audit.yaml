@@ -34,16 +34,21 @@ cluster:
           userGroups: ["system:serviceaccounts", "system:nodes"]
           verbs: ["get", "list", "watch"]
 
-        # Full request+response payloads for security-sensitive mutations
+        # Secrets: metadata only.
+        - level: Metadata
+          verbs: ["create", "update", "patch", "delete", "deletecollection"]
+          resources:
+            - group: ""
+              resources: ["secrets"]
+
+        # Full request+response payloads for the rest of the sensitive mutations
         - level: RequestResponse
           verbs: ["create", "update", "patch", "delete", "deletecollection"]
           resources:
             - group: ""
-              resources: ["secrets", "configmaps", "serviceaccounts"]
+              resources: ["configmaps", "serviceaccounts"]
             - group: "rbac.authorization.k8s.io"
               resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
-            - group: "policy"
-              resources: ["podsecuritypolicies"]
 
         # Metadata for everything else (covers who did what to what)
         - level: Metadata
