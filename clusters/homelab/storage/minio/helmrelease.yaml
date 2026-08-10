@@ -33,7 +33,17 @@ spec:
       size: 20Gi
     resources:
       requests:
+        cpu: 100m
         memory: 512Mi
+    securityContext:
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
     buckets:
       - name: outline
         policy: none
@@ -47,3 +57,31 @@ spec:
       enabled: false
     consoleIngress:
       enabled: false
+  # The chart has no probe support at all (nothing in the deployment template),
+  # so they're grafted on. MinIO's health endpoints are unauthenticated by design.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Deployment
+              name: minio
+            patch: |
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: minio
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: minio
+                        livenessProbe:
+                          httpGet:
+                            path: /minio/health/live
+                            port: 9000
+                          periodSeconds: 30
+                        readinessProbe:
+                          httpGet:
+                            path: /minio/health/ready
+                            port: 9000
+                          periodSeconds: 10

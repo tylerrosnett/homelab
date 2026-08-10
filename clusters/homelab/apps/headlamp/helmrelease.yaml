@@ -45,3 +45,17 @@ spec:
         scopes: openid email profile groups offline_access
         callbackURL: https://headlamp.tylerrosnett.com/oidc-callback
         usePKCE: true
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+    resources:
+      requests:
+        cpu: 25m
+        memory: 128Mi
+      limits:
+        memory: 256Mi

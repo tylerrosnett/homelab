@@ -29,6 +29,15 @@ spec:
     web:
       forceHttps: false
     replicaCount: 1
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
     ingress:
       enabled: false
     postgresql:
