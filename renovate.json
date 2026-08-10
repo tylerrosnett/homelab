@@ -5,25 +5,28 @@
     ":dependencyDashboard",
     ":semanticCommits",
     ":gitSignOff",
-    "helpers:pinGitHubActionDigests",
-    "schedule:nonOfficeHours"
+    ":configMigration",
+    "helpers:pinGitHubActionDigests"
   ],
   "timezone": "America/Los_Angeles",
+  "schedule": ["* 18-23,0-4 * * 1-5", "* * * * 0,6"],
   "prHourlyLimit": 4,
   "prConcurrentLimit": 10,
   "labels": ["dependencies"],
   "assignees": ["tylerrosnett"],
+  "minimumReleaseAge": "3 days",
+  "osvVulnerabilityAlerts": true,
   "flux": {
-    "fileMatch": ["(^|/)clusters/.+\\.ya?ml$"]
+    "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"]
   },
   "helm-values": {
-    "fileMatch": ["(^|/)clusters/.+\\.ya?ml$"]
+    "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"]
   },
   "kubernetes": {
-    "fileMatch": ["(^|/)clusters/.+\\.ya?ml$", "(^|/)talos/.+\\.ya?ml$"]
+    "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"]
   },
-  "kustomize": {
-    "fileMatch": ["(^|/)kustomization\\.ya?ml$"]
+  "crossplane": {
+    "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"]
   },
   "packageRules": [
     {
@@ -42,24 +45,52 @@
       "groupName": "cilium"
     },
     {
-      "description": "Auto-merge patch updates of well-known charts (still opens PR for review)",
-      "matchUpdateTypes": ["patch"],
-      "matchPackageNames": ["cert-manager", "external-dns", "longhorn"],
-      "automerge": false
+      "description": "Group the Flux distribution and the operator that installs it",
+      "matchPackageNames": [
+        "fluxcd/flux2",
+        "ghcr.io/controlplaneio-fluxcd/charts/flux-operator"
+      ],
+      "groupName": "flux"
+    },
+    {
+      "description": "Group the four Crossplane Cloudflare providers so they bump in lockstep",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["xpkg.upbound.io/wildbitca/**"],
+      "groupName": "crossplane-cloudflare-providers"
+    },
+    {
+      "description": "Major updates wait for Dependency Dashboard approval",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
     },
     {
       "description": "Talos version bumps need manual review + per-node rollout",
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["ghcr.io/siderolabs/installer"],
+      "matchDatasources": ["github-releases"],
+      "matchDepNames": ["siderolabs/talos"],
       "labels": ["dependencies", "talos", "manual-rollout-required"],
-      "groupName": "talos"
+      "groupName": "talos",
+      "prBodyNotes": [
+        "**Merging this does not upgrade anything.** Rollout is manual: `talhelper genconfig`, then `talosctl upgrade` node-by-node (oak, maple, pine, birch, cedar).",
+        "On a minor bump, check the [Talos support matrix](https://www.talos.dev/latest/introduction/support-matrix/) and raise the `kubernetes/kubernetes` `allowedVersions` ceiling in `renovate.json` to match."
+      ]
+    },
+    {
+      "description": "K8s ceiling from the Talos support matrix (Talos 1.13 supports K8s <= 1.36). Raise this after a Talos minor upgrade, not before.",
+      "matchDepNames": ["kubernetes/kubernetes"],
+      "allowedVersions": "<1.37.0"
+    },
+    {
+      "description": "K8s minor bumps must follow a Talos upgrade — approve from the Dependency Dashboard",
+      "matchDepNames": ["kubernetes/kubernetes"],
+      "matchUpdateTypes": ["minor", "major"],
+      "dependencyDashboardApproval": true
     }
   ],
   "customManagers": [
     {
       "customType": "regex",
       "description": "Talos version in talconfig.yaml",
-      "fileMatch": ["^talos/talconfig\\.ya?ml$"],
+      "managerFilePatterns": ["/^talos/talconfig\\.ya?ml$/"],
       "matchStrings": ["talosVersion:\\s*(?<currentValue>v\\S+)"],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "siderolabs/talos"
@@ -67,10 +98,39 @@
     {
       "customType": "regex",
       "description": "Kubernetes version in talconfig.yaml",
-      "fileMatch": ["^talos/talconfig\\.ya?ml$"],
+      "managerFilePatterns": ["/^talos/talconfig\\.ya?ml$/"],
       "matchStrings": ["kubernetesVersion:\\s*(?<currentValue>v\\S+)"],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "kubernetes/kubernetes"
+    },
+    {
+      "customType": "regex",
+      "description": "Flux minor version in FluxInstance (the operator applies patches within the .x range)",
+      "managerFilePatterns": ["/^clusters/homelab/flux-system/flux-instance\\.ya?ml$/"],
+      "matchStrings": ["version:\\s*\"(?<currentValue>\\d+\\.\\d+)\\.x\""],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "fluxcd/flux2",
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+)\\.\\d+$",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "flux-operator chart tag (nested in a ResourceSet, so the flux manager can't see it)",
+      "managerFilePatterns": ["/^clusters/homelab/flux-system/flux-operator\\.ya?ml$/"],
+      "matchStrings": [
+        "url: oci://ghcr\\.io/controlplaneio-fluxcd/charts/flux-operator[\\s\\S]*?tag: \"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "ghcr.io/controlplaneio-fluxcd/charts/flux-operator"
+    },
+    {
+      "customType": "regex",
+      "description": "Tool versions in CI workflows, marked with a `# renovate:` comment",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+\\w+: (?<currentValue>v?\\S+)"
+      ],
+      "versioningTemplate": "semver"
     }
   ]
 }

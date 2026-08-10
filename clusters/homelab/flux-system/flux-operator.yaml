@@ -18,7 +18,11 @@ spec:
         interval: 1h
         url: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator
         ref:
-          semver: '>=0.0.0'
+          # Pinned, not semver '>=0.0.0': a floating range let the operator upgrade itself
+          # with no PR and no git record of the running version. Renovate bumps this via the
+          # flux-operator-version customManager in renovate.json (the flux manager can't see
+          # OCIRepositories nested inside a ResourceSet).
+          tag: "0.58.0"
     - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease
       metadata:
