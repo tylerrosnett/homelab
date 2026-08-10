@@ -29,8 +29,9 @@ spec:
         memory: 64Mi
   # The chart templates no securityContext, so it's grafted on here. nginx
   # runs non-root (uid 101) with NET_BIND_SERVICE for :80 — same pattern as
-  # blocky — and gets emptyDirs for the two paths it writes under a
-  # read-only rootfs.
+  # blocky — and gets emptyDirs for what it writes under a read-only rootfs.
+  # The image is Alpine-packaged nginx: temp dirs live at /var/lib/nginx/tmp
+  # and logs at /var/log/nginx, not the official image's /var/cache/nginx.
   postRenderers:
     - kustomize:
         patches:
@@ -62,12 +63,16 @@ spec:
                             add:
                               - NET_BIND_SERVICE
                         volumeMounts:
-                          - name: nginx-cache
-                            mountPath: /var/cache/nginx
+                          - name: nginx-tmp
+                            mountPath: /var/lib/nginx/tmp
+                          - name: nginx-log
+                            mountPath: /var/log/nginx
                           - name: nginx-run
                             mountPath: /run
                     volumes:
-                      - name: nginx-cache
+                      - name: nginx-tmp
+                        emptyDir: {}
+                      - name: nginx-log
                         emptyDir: {}
                       - name: nginx-run
                         emptyDir: {}
