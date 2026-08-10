@@ -84,31 +84,11 @@ spec:
             }]
           }
 
+          // No label promotion here on purpose. Promoting audit fields (verb, user,
+          // resource, ...) to labels made one stream per combination — 10k+ active
+          // streams, Loki's stream_limit discarding logs. Filter at query time:
+          //   {job="kube-apiserver-audit"} | json | verb="delete"
           loki.source.file "audit" {
             targets    = local.file_match.audit.targets
-            forward_to = [loki.process.audit.receiver]
-          }
-
-          loki.process "audit" {
             forward_to = [loki.write.default.receiver]
-            stage.json {
-              expressions = {
-                verb        = "verb",
-                user        = "user.username",
-                resource    = "objectRef.resource",
-                namespace   = "objectRef.namespace",
-                stage       = "stage",
-                code        = "responseStatus.code",
-              }
-            }
-            stage.labels {
-              values = {
-                verb      = "",
-                user      = "",
-                resource  = "",
-                namespace = "",
-                stage     = "",
-                code      = "",
-              }
-            }
           }
