@@ -35,11 +35,18 @@ spec:
               value: AUTO_CURSEFORGE
             - name: CF_SLUG
               value: all-the-mods-10
+            - name: CF_FILE_ID
+              value: "8649077"
             - name: CF_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: curseforge
                   key: CF_API_KEY
+            - name: MODS  # server-side only; clients connect without them
+              value: |-
+                https://cdn.modrinth.com/data/gvQqBUqZ/versions/DDUrRVCA/lithium-neoforge-0.15.4%2Bmc1.21.1.jar
+                https://cdn.modrinth.com/data/l6YH9Als/versions/v5qtqRQi/spark-1.10.124-neoforge.jar
+                https://cdn.modrinth.com/data/fALzjamp/versions/LuFhm4eU/Chunky-NeoForge-1.4.23.jar
             - name: MEMORY
               value: 12G
             - name: USE_AIKAR_FLAGS
@@ -67,11 +74,13 @@ spec:
             - name: VIEW_DISTANCE
               value: "10"
             - name: SIMULATION_DISTANCE
-              value: "6"
+              value: "4"
             - name: SYNC_CHUNK_WRITES
               value: "false"  # async chunk saves — sync writes pay Longhorn replication latency on the main thread
             - name: TZ
               value: America/Los_Angeles
+            - name: CREATE_CONSOLE_IN_PIPE
+              value: "true"
           ports:
             - name: minecraft
               containerPort: 25565
