@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: longhorn-manager-allow-metrics
+  namespace: longhorn-system
+spec:
+  # The chart renders its own NetworkPolicy/longhorn-manager whenever
+  # networkPolicies.restrictInternalTraffic is true (default since chart
+  # 1.12.1) and offers no hook for extra ingress rules. Ingress policies union,
+  # so this one widens that policy rather than replacing it — alone it would
+  # allow only monitoring and cut off Longhorn's internal traffic.
+  podSelector:
+    matchLabels:
+      app: longhorn-manager
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9500

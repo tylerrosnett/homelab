@@ -5,3 +5,4 @@ resources:
   - repository.yaml
   - helmrelease.yaml
   - httproute.yaml
+  - networkpolicy.yaml
