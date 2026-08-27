@@ -27,7 +27,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: minecraft
-          image: itzg/minecraft-server:2026.8.1-java21
+          image: itzg/minecraft-server:2026.8.2-java21
           env:
             - name: EULA
               value: "TRUE"
