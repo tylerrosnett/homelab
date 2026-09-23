@@ -26,7 +26,7 @@ spec:
     # Add more here if/when nodes join.
     providerRegex: '^(oak|maple|pine|birch|cedar)$'
     # IP SAN must fall in this prefix list (LAN /24 covers all three node IPs + VIP).
-    providerIpPrefixes: '192.168.1.0/24'
+    providerIpPrefixes: '10.10.10.0/24'
     # Homelab has no per-node DNS records; skip the resolve-back check.
     bypassDnsResolution: true
     # Max cert validity — 24h matches kubelet rotation default.

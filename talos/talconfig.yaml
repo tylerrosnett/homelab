@@ -1,5 +1,5 @@
 clusterName: homelab
-endpoint: https://192.168.1.246:6443  # Talos VIP
+endpoint: https://10.10.10.246:6443  # Talos VIP
 
 talosVersion: v1.13.9
 kubernetesVersion: v1.36.4
@@ -10,11 +10,11 @@ cniConfig:
 allowSchedulingOnControlPlanes: true  # compact 3-node cluster — workloads share controlplanes
 
 additionalApiServerCertSans:
-  - 192.168.1.246
+  - 10.10.10.246
 
 nodes:
   - hostname: oak
-    ipAddress: 192.168.1.5
+    ipAddress: 10.10.10.5
     installDiskSelector:
       size: '>= 200GB'
       type: ssd
@@ -23,15 +23,15 @@ nodes:
       - interface: eno1
         dhcp: false
         addresses:
-          - 192.168.1.5/24
+          - 10.10.10.5/24
         routes:
           - network: 0.0.0.0/0
-            gateway: 192.168.1.1
+            gateway: 10.10.10.1
         vip:
-          ip: 192.168.1.246
+          ip: 10.10.10.246
 
   - hostname: maple
-    ipAddress: 192.168.1.6
+    ipAddress: 10.10.10.6
     installDiskSelector:
       size: '>= 200GB'
       type: ssd
@@ -40,15 +40,15 @@ nodes:
       - interface: eno1
         dhcp: false
         addresses:
-          - 192.168.1.6/24
+          - 10.10.10.6/24
         routes:
           - network: 0.0.0.0/0
-            gateway: 192.168.1.1
+            gateway: 10.10.10.1
         vip:
-          ip: 192.168.1.246
+          ip: 10.10.10.246
 
   - hostname: pine
-    ipAddress: 192.168.1.7
+    ipAddress: 10.10.10.7
     installDiskSelector:
       size: '>= 200GB'
       type: ssd
@@ -57,49 +57,12 @@ nodes:
       - interface: eno1
         dhcp: false
         addresses:
-          - 192.168.1.7/24
+          - 10.10.10.7/24
         routes:
           - network: 0.0.0.0/0
-            gateway: 192.168.1.1
+            gateway: 10.10.10.1
         vip:
-          ip: 192.168.1.246
-
-  # Proxmox VMs on the R640s (baobab = 192.168.1.12, redwood = 192.168.1.13)
-  - hostname: birch
-    ipAddress: 192.168.1.10
-    installDiskSelector:
-      size: '>= 200GB'
-      type: ssd  # requires "SSD emulation" ticked on the Proxmox virtual disk
-    controlPlane: false
-    nodeLabels:
-      homelab/node-class: game
-    networkInterfaces:
-      - deviceSelector:
-          driver: virtio_net
-        dhcp: false
-        addresses:
-          - 192.168.1.10/24
-        routes:
-          - network: 0.0.0.0/0
-            gateway: 192.168.1.1
-
-  - hostname: cedar
-    ipAddress: 192.168.1.11
-    installDiskSelector:
-      size: '>= 200GB'
-      type: ssd  # requires "SSD emulation" ticked on the Proxmox virtual disk
-    controlPlane: false
-    nodeLabels:
-      homelab/node-class: bulk
-    networkInterfaces:
-      - deviceSelector:
-          driver: virtio_net
-        dhcp: false
-        addresses:
-          - 192.168.1.11/24
-        routes:
-          - network: 0.0.0.0/0
-            gateway: 192.168.1.1
+          ip: 10.10.10.246
 
 controlPlane:
   schematic:

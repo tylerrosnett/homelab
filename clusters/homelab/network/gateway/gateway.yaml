@@ -12,7 +12,7 @@ spec:
       lb-announce: "true"
   addresses:
     - type: IPAddress
-      value: 192.168.1.200
+      value: 10.10.10.200
   listeners:
     - name: http
       protocol: HTTP

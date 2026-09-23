@@ -8,8 +8,7 @@ spec:
     - tag:homelab
   subnetRouter:
     advertiseRoutes:
-      - "192.168.1.0/24"
-      - "192.168.10.0/24"
+      - "10.10.10.0/24"
 ---
 apiVersion: tailscale.com/v1alpha1
 kind: Connector
@@ -21,5 +20,4 @@ spec:
     - tag:homelab
   subnetRouter:
     advertiseRoutes:
-      - "192.168.1.0/24"
-      - "192.168.10.0/24"
+      - "10.10.10.0/24"
