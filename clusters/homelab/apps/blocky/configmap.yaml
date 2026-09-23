@@ -33,6 +33,11 @@ data:
           timeout: 60s
           attempts: 3
 
+    conditional:
+      mapping:
+        arboretumlab.com: 10.10.100.10
+        100.10.10.in-addr.arpa: 10.10.100.10
+
     caching:
       prefetching: true
       prefetchExpires: 2h
