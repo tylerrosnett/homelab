@@ -1,6 +1,6 @@
 # homelab
 
-A 5-node Kubernetes cluster: three second-hand Lenovo ThinkCentre thin clients as control planes, plus two Proxmox VMs on Dell R640s as workers.
+A 3-node Kubernetes cluster: three second-hand Lenovo ThinkCentre thin clients, all control planes and all schedulable.
 
 Everything is GitOps. Everything is declarative. The repo is the cluster — node OS config, networking, storage, observability, auth, and workloads all live here as code and are reconciled automatically. There is no `kubectl apply` step in any normal workflow; a merge to `main` is the deploy.
 
@@ -10,21 +10,21 @@ The stack: [Talos Linux](https://www.talos.dev/) for the OS (immutable, API-driv
 
 | | |
 | --- | --- |
-| Control plane | `oak` (192.168.1.5), `maple` (192.168.1.6), `pine` (192.168.1.7) — schedulable |
-| Workers | `birch` (192.168.1.10, `node-class: game`), `cedar` (192.168.1.11, `node-class: bulk`) — Proxmox VMs |
-| API VIP | 192.168.1.246 |
+| Control plane | `oak` (10.10.10.5), `maple` (10.10.10.6), `pine` (10.10.10.7) — schedulable |
+| Workers | none (Proxmox VM workers `birch`/`cedar` removed 2026-09-22) |
+| API VIP | 10.10.10.246 |
 | Talos / Kubernetes | see `talos/talconfig.yaml` — Renovate keeps it current |
 | CNI | Cilium (kube-proxy replacement, eBPF, L2 announcements, apiserver via KubePrism) |
 | Storage | Longhorn (3 replicas, default StorageClass) |
 | Certs | cert-manager + Let's Encrypt (DNS01 via Cloudflare) |
 | DNS | ExternalDNS → Cloudflare (internal hostnames only) |
-| Ad-blocking | Blocky — LAN-wide DNS sinkhole at `192.168.1.202`; pfSense forwards all queries to it |
+| Ad-blocking | Blocky — LAN DNS resolver at `10.10.10.202`, handed out by UniFi DHCP; forwards `arboretumlab.com` to bonsai |
 | Ingress | Cilium Gateway API — internal gateway on LAN, public gateway behind cloudflared |
 | Observability | kube-prometheus-stack, Loki single-binary, Grafana Alloy DaemonSet, Hubble UI |
 | Uptime monitoring | blackbox-exporter HTTP probes; alerts → Discord via Alertmanager `discord_configs` |
 | Energy monitoring | Shelly Plug US Gen4 per-node smart plugs → Home Assistant → Prometheus → Grafana |
 | Auth | Cloudflare Access SaaS OIDC → kube-apiserver, Headlamp, and kubectl (via kubelogin) |
-| Remote access | Tailscale operator with 2 HA subnet routers advertising `192.168.1.0/24` |
+| Remote access | Tailscale operator with 2 HA subnet routers advertising `10.10.10.0/24` |
 | Dependency updates | Renovate (Mend-hosted) — config in `renovate.json`, opens grouped PRs nightly/weekends |
 
 ## Repository layout
@@ -77,33 +77,32 @@ Wrappers set `wait: true` rather than `healthChecks`. Flux ignores `spec.healthC
 
 ## Networking
 
-- **Internal apps** live at `*.internal.tylerrosnett.com`. DNS resolves to the LAN gateway IP `192.168.1.200` (L2-announced from one Cilium node). TLS terminated at the gateway using a Let's Encrypt wildcard cert (DNS01).
+- **Internal apps** live at `*.internal.tylerrosnett.com`. DNS resolves to the LAN gateway IP `10.10.10.200` (L2-announced from one Cilium node). TLS terminated at the gateway using a Let's Encrypt wildcard cert (DNS01).
 - **Public apps** live at `<name>.tylerrosnett.com`. DNS is a wildcard CNAME pointing at the Cloudflare tunnel; Cloudflare terminates TLS at its edge and forwards through the tunnel to the in-cluster `cf-tunnel` Gateway over plain HTTP.
 - The public gateway gates which namespaces can attach routes by matching the `expose-public: "true"` label on the namespace.
 - L2 announcement is opt-in via the `lb-announce: "true"` label on the LoadBalancer Service (set on the internal gateway, not the public one).
-- **Redirect-only HTTPRoutes** are possible without any backend Service — see `network/gateway/pfsense-redirect.yaml` for `pfsense.internal.tylerrosnett.com` → 302 to `https://192.168.1.1` via Gateway API's `RequestRedirect` filter.
 
 ## Remote access (Tailscale)
 
-The Tailscale operator (`network/tailscale/`) runs in the `tailscale` namespace and is authenticated via an OAuth client (SOPS-encrypted secret `operator-oauth`). Two `Connector` CRs (`network/tailscale-connectors/`) each spawn a subnet-router pod that advertises `192.168.1.0/24` — HA pair: lose one, the other carries traffic.
+The Tailscale operator (`network/tailscale/`) runs in the `tailscale` namespace and is authenticated via an OAuth client (SOPS-encrypted secret `operator-oauth`). Two `Connector` CRs (`network/tailscale-connectors/`) each spawn a subnet-router pod that advertises `10.10.10.0/24` — HA pair: lose one, the other carries traffic.
 
 Operator + CR resources are split into two Flux Kustomizations because the Connector CRDs are installed by the operator's Helm chart; the CRs can't be applied until the CRDs exist. `tailscale-connectors` `dependsOn: tailscale` enforces the ordering.
 
 The `tailscale` namespace carries `pod-security.kubernetes.io/enforce: privileged` — subnet-router pods need privileged containers (sysctls + raw networking).
 
-Split DNS is configured in Tailscale admin (https://login.tailscale.com/admin/dns) → custom nameserver `192.168.1.1` restricted to `internal.tylerrosnett.com`. Clients with `--accept-routes` (Mac/iOS toggle "Use Tailscale Subnets") get LAN access + correct DNS for internal hostnames from anywhere.
+Tailscale split DNS (https://login.tailscale.com/admin/dns) covers only `arboretumlab.com` → bonsai (`10.10.100.10`). Internal hostnames need no split DNS: `*.internal.tylerrosnett.com` are public Cloudflare records pointing at `10.10.10.200`, so clients with `--accept-routes` (Mac/iOS toggle "Use Tailscale Subnets") reach them from anywhere over the subnet route.
 
 Tag `tag:homelab` is auto-applied to managed devices; the corresponding `tagOwners` entry is required in the Tailscale ACL.
 
 ## DNS ad-blocking (Blocky)
 
-[Blocky](https://github.com/0xERR0R/blocky) (`apps/blocky/`) is a LAN-wide DNS ad/tracker blocker. pfSense Unbound (`192.168.1.1`) stays the resolver every client talks to and **forwards** all queries to Blocky, which filters against blocklists and forwards clean lookups upstream to Cloudflare over DoT. Clients are untouched (DHCP still hands out pfSense); disabling Unbound's forwarding mode is an instant rollback.
+[Blocky](https://github.com/0xERR0R/blocky) (`apps/blocky/`) is the LAN's DNS resolver and ad/tracker blocker. UniFi DHCP on the Trusted network hands out `10.10.10.202` directly (no secondary, so everything is filtered); Blocky filters against blocklists and forwards clean lookups upstream to Cloudflare over DoT. Rollback is switching Trusted's DHCP DNS back to Auto in UniFi.
 
-- 2 replicas with pod anti-affinity and a PodDisruptionBudget (`minAvailable: 1`). DNS is served on a `LoadBalancer` Service at `192.168.1.202` (L2-announced via the `lb-announce` label), ports 53 UDP+TCP, default `externalTrafficPolicy` (`Cluster`). Do **not** set it to `Local`: Cilium's L2 lease election ignores pod placement, so a node with no local backend can win the lease, answer ARP, and blackhole every LAN DNS query. The HTTP/metrics port is a separate ClusterIP backing a ServiceMonitor.
+- 2 replicas with pod anti-affinity and a PodDisruptionBudget (`minAvailable: 1`). DNS is served on a `LoadBalancer` Service at `10.10.10.202` (L2-announced via the `lb-announce` label), ports 53 UDP+TCP, default `externalTrafficPolicy` (`Cluster`). Do **not** set it to `Local`: Cilium's L2 lease election ignores pod placement, so a node with no local backend can win the lease, answer ARP, and blackhole every LAN DNS query. The HTTP/metrics port is a separate ClusterIP backing a ServiceMonitor.
 - Blocklists: StevenBlack + hagezi pro, plus an inline allowlist. Query logging is disabled by choice — only aggregate Prometheus metrics (block rate, query totals, cache hits) are kept, surfaced via Grafana dashboard #13768.
 - Namespace PSA is `restricted` (Blocky runs non-root and only needs `NET_BIND_SERVICE` to bind `:53`).
-
-pfSense forwarding-mode gotchas: DNSSEC validation must be **off** (Blocky's synthetic `0.0.0.0` answers for blocked domains fail validation → SERVFAIL on blocked names only), the `private-domain` custom option needs a `server:` prefix to survive forwarding mode, "Use SSL/TLS for outgoing queries" must stay off (Blocky is plain DNS on `:53`), and Blocky must be the sole upstream (forwarding mode races all listed servers). Split-DNS host overrides for `*.internal.tylerrosnett.com` still resolve locally before any forward.
+- Conditional forwarding sends `arboretumlab.com` and its reverse zone (`100.10.10.in-addr.arpa`) to Technitium on bonsai (`10.10.100.10`), which stays the only authoritative source for lab names.
+- Blocky reads its config only at startup; restart the Deployment after changing the ConfigMap.
 
 Note: DNS blocking only stops third-party ad/tracker domains — first-party in-app ads (Pinterest, YouTube, Instagram) come down the same domains as the content and aren't blockable this way.
 
@@ -151,7 +150,7 @@ Stack lives in the `monitoring` namespace.
 
 The `monitoring` namespace carries `pod-security.kubernetes.io/enforce: privileged` because node-exporter needs `hostNetwork`/`hostPID`. Grafana uses `Recreate` deployment strategy (RWO PVC + `RollingUpdate` deadlocks).
 
-Internal UIs exposed via `*.internal.tylerrosnett.com`: `longhorn`, `prometheus`, `alertmanager`, `headlamp`, `hubble` (Cilium flow observability — `hubble.relay.enabled` + `hubble.ui.enabled` on the Cilium HelmRelease), `ha` / `homeassistant` (Home Assistant), `pfsense` (redirect-only).
+Internal UIs exposed via `*.internal.tylerrosnett.com`: `longhorn`, `prometheus`, `alertmanager`, `headlamp`, `hubble` (Cilium flow observability — `hubble.relay.enabled` + `hubble.ui.enabled` on the Cilium HelmRelease), `ha` / `homeassistant` (Home Assistant).
 
 Prometheus and Alertmanager both have `externalUrl` set to their `*.internal.tylerrosnett.com` hostnames so "Source" links in Alertmanager and links in Discord notifications resolve from a browser (otherwise they'd point at cluster-internal service DNS).
 
@@ -208,7 +207,7 @@ talhelper genconfig
 talosctl apply-config --insecure --nodes <ip> --file ./clusterconfig/<hostname>.yaml
 
 # Get kubeconfig
-talosctl kubeconfig --nodes 192.168.1.246 --endpoints 192.168.1.246
+talosctl kubeconfig --nodes 10.10.10.246 --endpoints 10.10.10.246
 
 # Force a Flux reconcile
 flux reconcile kustomization flux-system --with-source

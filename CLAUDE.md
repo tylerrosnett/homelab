@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository purpose
 
-GitOps configuration for a 5-node Talos Linux Kubernetes homelab. Flat layout — everything cluster-related lives under `clusters/homelab/` (single cluster, no need to split apps from infra across directories):
+GitOps configuration for a 3-node Talos Linux Kubernetes homelab. Flat layout — everything cluster-related lives under `clusters/homelab/` (single cluster, no need to split apps from infra across directories):
 
 - `talos/` — Talos node configuration via [talhelper](https://github.com/budimanjojo/talhelper); `talconfig.yaml` is the single source of truth.
 - `clusters/homelab/flux-system/` — Flux bootstrap (flux-operator + FluxInstance) and root Kustomizations for the `homelab` cluster.
@@ -26,9 +26,9 @@ Each subsystem follows the pattern: a directory with raw manifests + `kustomizat
 
 ## Cluster facts (don't re-derive)
 
-- Controlplane nodes (bare metal, interface `eno1`): `oak` 192.168.1.5, `maple` 192.168.1.6, `pine` 192.168.1.7. Schedulable (`allowSchedulingOnControlPlanes: true`).
-- Worker nodes (Proxmox VMs on the R640s, `deviceSelector: driver: virtio_net`): `birch` 192.168.1.10 (`homelab/node-class: game` — minecraft pins to it), `cedar` 192.168.1.11 (`homelab/node-class: bulk`).
-- Kubernetes API VIP: `192.168.1.246` (Talos shared VIP on `eno1`).
+- Controlplane nodes (bare metal, interface `eno1`): `oak` 10.10.10.5, `maple` 10.10.10.6, `pine` 10.10.10.7. Schedulable (`allowSchedulingOnControlPlanes: true`).
+- No worker nodes. The Proxmox VM workers `birch` (`homelab/node-class: game`) and `cedar` (`bulk`) were removed on 2026-09-22. Minecraft keeps its `node-class: game` nodeSelector and is scaled to 0 until a game node is added.
+- Kubernetes API VIP: `10.10.10.246` (Talos shared VIP on `eno1`).
 - **Versions live in `talos/talconfig.yaml` and Renovate bumps them — read the file, don't trust a number written here.** Note that merging a Renovate Talos/k8s PR changes only git; the rollout (`talhelper genconfig` + `talosctl upgrade`) is manual and has historically lagged.
 - CNI is `none` in Talos config — **Cilium is installed out-of-band**, so any networking work must account for Cilium being the actual CNI.
 - `kube-proxy` is disabled (Cilium kube-proxy replacement expected). Cilium reaches the apiserver via **KubePrism** (`localhost:7445`), not the VIP: Talos moves the VIP on etcd health, not apiserver health, so a node with healthy etcd and a sick apiserver could otherwise stall every agent.
@@ -44,8 +44,8 @@ Talos config workflow (run from `talos/`):
 talhelper genconfig                                                # regenerate ./clusterconfig/ (gitignored)
 talosctl disks --insecure --nodes <node-ip>                        # confirm disk name before apply
 talosctl apply-config --insecure --nodes <ip> --file ./clusterconfig/<hostname>.yaml
-talosctl bootstrap --nodes 192.168.1.5                             # ONCE, after all 3 nodes are up
-talosctl kubeconfig --nodes 192.168.1.246 --endpoints 192.168.1.246
+talosctl bootstrap --nodes 10.10.10.5                             # ONCE, after all 3 nodes are up
+talosctl kubeconfig --nodes 10.10.10.246 --endpoints 10.10.10.246
 ```
 
 Secrets:
@@ -74,8 +74,8 @@ sops <file>                                                                   # 
 
 Two Cilium Gateways are wired up:
 
-- **Internal** — `cilium-gateway` in `kube-system`. Listens on `*.internal.tylerrosnett.com` (HTTP + HTTPS). LoadBalancer service with L2-announced LAN IP `192.168.1.200`. TLS terminated at the gateway using a Let's Encrypt wildcard cert (via cert-manager DNS01). LAN-only.
-- **Public** — `cf-tunnel` in `kube-system`. Listens on `*.tylerrosnett.com` (HTTP). LoadBalancer service with LB IP `192.168.1.201` (not announced on LAN — see L2 scoping below). cloudflared connects to it via cluster DNS and exposes it through Cloudflare's edge with their cert. Public-internet-facing.
+- **Internal** — `cilium-gateway` in `kube-system`. Listens on `*.internal.tylerrosnett.com` (HTTP + HTTPS). LoadBalancer service with L2-announced LAN IP `10.10.10.200`. TLS terminated at the gateway using a Let's Encrypt wildcard cert (via cert-manager DNS01). LAN-only.
+- **Public** — `cf-tunnel` in `kube-system`. Listens on `*.tylerrosnett.com` (HTTP). LoadBalancer service with LB IP `10.10.10.201` (not announced on LAN — see L2 scoping below). cloudflared connects to it via cluster DNS and exposes it through Cloudflare's edge with their cert. Public-internet-facing.
 
 ### Adding an internal-only app
 
@@ -84,7 +84,7 @@ App namespace doesn't need any special label. Create:
 - `Deployment` + `Service`
 - `HTTPRoute` with `parentRefs: [{ name: cilium-gateway, namespace: kube-system }]` and `hostnames: [<name>.internal.tylerrosnett.com]`
 
-ExternalDNS auto-publishes `<name>.internal.tylerrosnett.com → 192.168.1.200` to Cloudflare DNS (regex `^(tylerrosnett\.com|.+\.internal\.tylerrosnett\.com)$` — apex match is required for zone discovery, even though only `*.internal.*` records get managed). TLS via the existing wildcard cert.
+ExternalDNS auto-publishes `<name>.internal.tylerrosnett.com → 10.10.10.200` to Cloudflare DNS (regex `^(tylerrosnett\.com|.+\.internal\.tylerrosnett\.com)$` — apex match is required for zone discovery, even though only `*.internal.*` records get managed). TLS via the existing wildcard cert.
 
 Optional polish: add a **Bookmark application** in Cloudflare Zero Trust (Access → Applications → Add → Bookmark) pointing at the new internal hostname so it shows up in the App Launcher (`https://tylerrosnett.cloudflareaccess.com/`). Bookmarks don't gate the destination (it's still LAN-only), just provide a directory.
 
@@ -158,31 +158,25 @@ When adding a new app that should be behind CF Access (rather than just LAN-only
 - **`tailscale` namespace needs `pod-security.kubernetes.io/enforce: privileged`** — subnet-router pods use privileged containers (sysctls + raw networking). Symptom of missing this: `FailedCreate` on the StatefulSet with `violates PodSecurity "baseline:latest": privileged`.
 - HA via 2 separate `Connector` CRs (subnet-router-a/b) advertising the same route. Tailscale handles failover between subnet routers automatically.
 - Routes must be approved in the Tailscale admin UI after pods register — this is one-time manual.
-- Split DNS in Tailscale admin forwards `*.internal.tylerrosnett.com` lookups to `192.168.1.1` (pfSense Unbound). Required so clients reaching the cluster over Tailscale resolve the internal hostnames correctly.
+- Tailscale split DNS on the personal tailnet covers only `arboretumlab.com` → bonsai (`10.10.100.10`). There is no split DNS for `*.internal.tylerrosnett.com`: those names are public Cloudflare records (ExternalDNS) pointing at `10.10.10.200`, reached over the `10.10.10.0/24` subnet route.
 
 **Pattern for any operator with CRDs + CRs in this repo:** split into two Flux Kustomizations (operator-installs-CRDs first, CRs second with `dependsOn`). Don't put both in one kustomize bundle — Flux dry-run validation fails on the CRs before the CRDs land.
 
 ## Blocky DNS ad-blocking
 
-`apps/blocky/` runs [Blocky](https://github.com/0xERR0R/blocky) as a LAN-wide DNS ad/tracker blocker. **Model A**: pfSense Unbound (192.168.1.1) stays the client-facing resolver and *forwards* upstream to Blocky; Blocky filters and forwards clean queries to Cloudflare DoT. Clients are unchanged (still use pfSense via DHCP); rollback = disable Unbound Forwarding Mode.
+`apps/blocky/` runs [Blocky](https://github.com/0xERR0R/blocky) as the LAN's DNS resolver and ad/tracker blocker. UniFi DHCP on the Trusted network hands out `10.10.10.202` directly, with no secondary DNS (deliberate: everything gets filtered). Blocky filters against the denylists and forwards clean queries to Cloudflare DoT. Rollback = set Trusted's DHCP DNS back to Auto in UniFi.
 
 - Raw manifests (no first-party Helm chart). Config is a ConfigMap (`config.yml`); `queryLog.type: none` (no per-request logging by choice — aggregate Prometheus metrics only). Upstreams are Cloudflare DoT (`tcp-tls:1.1.1.1:853` / `1.0.0.1:853`). Denylists: StevenBlack + hagezi pro, with an inline allowlist for false positives.
 - **2 replicas** with `requiredDuringScheduling` pod anti-affinity (DNS shouldn't flap on a node reboot). Namespace PSA is **`restricted`** — Blocky runs non-root and only needs `NET_BIND_SERVICE` (the one cap `restricted` permits) to bind :53.
-- **DNS Service** is `LoadBalancer` at `192.168.1.202` (`lb-announce: "true"` for L2 announce), ports 53/UDP+TCP, default `externalTrafficPolicy` (`Cluster` — do NOT set `Local`, see L2 announcement scoping). Separate ClusterIP `blocky-metrics:4000` backs the ServiceMonitor (`release: kube-prometheus-stack`). No gateway HTTPRoute — Blocky has no web UI.
-- Because of Model A, all queries reach Blocky from pfSense's IP, so there is no per-client granularity in metrics (consistent with the no-logging choice).
-
-**pfSense forwarding-mode gotchas (don't re-derive):**
-- **DNSSEC must be OFF.** Services → DNS Resolver → uncheck "Enable DNSSEC Support". Blocky returns synthetic `0.0.0.0` for blocked domains; Unbound with DNSSEC validation marks that bogus → **SERVFAIL on blocked domains only** (clean domains still resolve). This is the signature symptom. Encryption/validation still happens upstream at Blocky→Cloudflare DoT.
-- **`private-domain` custom option needs an explicit `server:` prefix.** pfSense appends Custom Options at the end of `unbound.conf`; once Forwarding Mode injects a `forward-zone:` block, a bare `private-domain: "tylerrosnett.com"` lands in forward-zone context and Unbound rejects it (`syntax error`). Prefix the Custom Options block with `server:` to re-enter server context.
-- **"Use SSL/TLS for outgoing queries" must stay OFF** — Blocky listens plain DNS on :53, not DoT on :853.
-- Blocky must be the **only** DNS server in System → General; in forwarding mode Unbound races all listed servers, so a leftover `1.1.1.1` lets queries bypass the blocker. Also uncheck the WAN DNS override.
-- Split-DNS host overrides (`*.internal.tylerrosnett.com`) still win — Unbound answers them locally before forwarding, so Blocky never sees them.
+- **DNS Service** is `LoadBalancer` at `10.10.10.202` (`lb-announce: "true"` for L2 announce), ports 53/UDP+TCP, default `externalTrafficPolicy` (`Cluster` — do NOT set `Local`, see L2 announcement scoping). Separate ClusterIP `blocky-metrics:4000` backs the ServiceMonitor (`release: kube-prometheus-stack`). No gateway HTTPRoute — Blocky has no web UI.
+- **Conditional forwarding**: `arboretumlab.com` and `100.10.10.in-addr.arpa` go to Technitium on bonsai (`10.10.100.10`), the only authoritative source for the lab zone (forward and reverse). Blocky's queries leave via the node IPs on Trusted, which the UniFi Trusted → Lab-mgmt allow policy permits. Lab records are deliberately not published in Cloudflare.
+- **Blocky reads its config only at startup.** After a ConfigMap change, `kubectl -n blocky rollout restart deploy/blocky`.
 
 ## Home Assistant + smart-plug energy monitoring
 
 `apps/home-assistant/` runs HA as a plain container (no Supervisor → **no add-on store, no UI file editor**). `hostNetwork: true` + `ClusterFirstWithHostNet` so HA can do mDNS discovery of LAN devices (Shelly plugs, HomeKit). Exposed at `ha.internal.tylerrosnett.com` / `homeassistant.internal.tylerrosnett.com` via the internal gateway. Config lives on the Longhorn PVC, **not in git** — edit via `kubectl -n home-assistant exec -it deploy/home-assistant -- vi /config/configuration.yaml`.
 
-Energy pipeline: Shelly Plug US Gen4 (LAN, static DHCP mappings at `192.168.1.250+`, hostnames `plug-<node>` registered in pfSense DNS) → HA Shelly integration → HA `prometheus:` integration → ServiceMonitor scrape → Grafana `Energy / Smart Plugs` dashboard (`extra-dashboards/dashboards/energy.json`).
+Energy pipeline: Shelly Plug US Gen4 (LAN; currently unplugged — when reconnected they need Trusted DHCP reservations, since the old pfSense mappings and hostnames are gone) → HA Shelly integration → HA `prometheus:` integration → ServiceMonitor scrape → Grafana `Energy / Smart Plugs` dashboard (`extra-dashboards/dashboards/energy.json`).
 
 Gotchas (don't re-derive):
 

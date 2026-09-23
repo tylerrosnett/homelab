@@ -36,20 +36,20 @@ talosctl apply-config --insecure --nodes <node-ip> --file ./clusterconfig/<hostn
 ## Bootstrap etcd (first node only, after all 3 are up)
 
 ```bash
-talosctl bootstrap --nodes 192.168.1.5
+talosctl bootstrap --nodes 10.10.10.5
 ```
 
 ## Fetch kubeconfig
 
 ```bash
-talosctl kubeconfig --nodes 192.168.1.246 --endpoints 192.168.1.246
+talosctl kubeconfig --nodes 10.10.10.246 --endpoints 10.10.10.246
 ```
 
 ## Node IPs
 
 | Hostname | IP            | Role          |
 |----------|---------------|---------------|
-| oak      | 192.168.1.5   | controlplane  |
-| maple    | 192.168.1.6   | controlplane  |
-| pine     | 192.168.1.7   | controlplane  |
-| VIP      | 192.168.1.246 | Kubernetes API|
+| oak      | 10.10.10.5   | controlplane  |
+| maple    | 10.10.10.6   | controlplane  |
+| pine     | 10.10.10.7   | controlplane  |
+| VIP      | 10.10.10.246 | Kubernetes API|

@@ -4,7 +4,7 @@ metadata:
   name: blocky
   namespace: blocky
 spec:
-  # LAN-wide DNS: pfSense forwards every query here, so a drain must never take both pods.
+  # LAN-wide DNS: every client on Trusted queries Blocky directly, so a drain must never take both pods.
   minAvailable: 1
   selector:
     matchLabels:
