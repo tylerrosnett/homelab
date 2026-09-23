@@ -9,7 +9,7 @@ spec:
   ref:
     # Renovate's flux manager bumps this tag (git-tags datasource). Merging the PR
     # applies the new CRD schemas directly — no vendoring step.
-    tag: v1.6.1
+    tag: v1.6.2
   ignore: |
     # artifact only needs the CRD kustomization
     /*
