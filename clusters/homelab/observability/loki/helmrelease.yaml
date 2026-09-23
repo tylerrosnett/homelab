@@ -45,6 +45,9 @@ spec:
         ingestion_rate_mb: 16
         ingestion_burst_size_mb: 32
         max_global_streams_per_user: 10000
+        # kube-apiserver audit entries for big objects (CRDs) run 640 KB–1 MB and
+        # were rejected outright; truncate to max_line_size (256 KB) and keep them.
+        max_line_size_truncate: true
       compactor:
         retention_enabled: true
         delete_request_store: filesystem
