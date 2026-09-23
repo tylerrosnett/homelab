@@ -10,7 +10,7 @@ spec:
   chart:
     spec:
       chart: outline
-      version: 0.9.3
+      version: 0.9.5
       sourceRef:
         kind: HelmRepository
         name: outline
