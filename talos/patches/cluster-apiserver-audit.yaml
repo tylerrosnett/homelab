@@ -1,54 +1,57 @@
-cluster:
-  apiServer:
-    extraArgs:
-      audit-log-path: /var/log/audit/kube/kube-apiserver-audit.log
-      audit-log-maxage: "30"
-      audit-log-maxbackup: "10"
-      audit-log-maxsize: "100"
-    auditPolicy:
-      apiVersion: audit.k8s.io/v1
-      kind: Policy
-      omitStages:
-        - RequestReceived
-      rules:
-        # Drop noisy health/version/discovery endpoints
-        - level: None
-          nonResourceURLs:
-            - /healthz*
-            - /livez*
-            - /readyz*
-            - /version
-            - /openapi*
-            - /api*
-            - /apis*
-            - /metrics
+apiVersion: v1alpha1
+kind: KubeAPIServerConfig
+extraArgs:
+  audit-log-path: /var/log/audit/kube/kube-apiserver-audit.log
+  audit-log-maxage: "30"
+  audit-log-maxbackup: "10"
+  audit-log-maxsize: "100"
+---
+apiVersion: v1alpha1
+kind: KubeAuditPolicyConfig
+configuration:
+  apiVersion: audit.k8s.io/v1
+  kind: Policy
+  omitStages:
+    - RequestReceived
+  rules:
+    # Drop noisy health/version/discovery endpoints
+    - level: None
+      nonResourceURLs:
+        - /healthz*
+        - /livez*
+        - /readyz*
+        - /version
+        - /openapi*
+        - /api*
+        - /apis*
+        - /metrics
 
-        # Drop high-volume leader-election lease churn
-        - level: None
-          resources:
-            - group: coordination.k8s.io
-              resources: ["leases"]
+    # Drop high-volume leader-election lease churn
+    - level: None
+      resources:
+        - group: coordination.k8s.io
+          resources: ["leases"]
 
-        # Drop authenticated system service-account reads (noisy controllers)
-        - level: None
-          userGroups: ["system:serviceaccounts", "system:nodes"]
-          verbs: ["get", "list", "watch"]
+    # Drop authenticated system service-account reads (noisy controllers)
+    - level: None
+      userGroups: ["system:serviceaccounts", "system:nodes"]
+      verbs: ["get", "list", "watch"]
 
-        # Secrets: metadata only.
-        - level: Metadata
-          verbs: ["create", "update", "patch", "delete", "deletecollection"]
-          resources:
-            - group: ""
-              resources: ["secrets"]
+    # Secrets: metadata only.
+    - level: Metadata
+      verbs: ["create", "update", "patch", "delete", "deletecollection"]
+      resources:
+        - group: ""
+          resources: ["secrets"]
 
-        # Full request+response payloads for the rest of the sensitive mutations
-        - level: RequestResponse
-          verbs: ["create", "update", "patch", "delete", "deletecollection"]
-          resources:
-            - group: ""
-              resources: ["configmaps", "serviceaccounts"]
-            - group: "rbac.authorization.k8s.io"
-              resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+    # Full request+response payloads for the rest of the sensitive mutations
+    - level: RequestResponse
+      verbs: ["create", "update", "patch", "delete", "deletecollection"]
+      resources:
+        - group: ""
+          resources: ["configmaps", "serviceaccounts"]
+        - group: "rbac.authorization.k8s.io"
+          resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
 
-        # Metadata for everything else (covers who did what to what)
-        - level: Metadata
+    # Metadata for everything else (covers who did what to what)
+    - level: Metadata

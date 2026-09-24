@@ -72,7 +72,6 @@ controlPlane:
           - siderolabs/iscsi-tools
           - siderolabs/util-linux-tools
   patches:
-    - "@./patches/cluster-cni-none.yaml"
     - "@./patches/cluster-proxy-disabled.yaml"
     - "@./patches/cluster-apiserver-oidc.sops.yaml"
     - "@./patches/cluster-apiserver-audit.yaml"
