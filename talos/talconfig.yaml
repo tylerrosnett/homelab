@@ -77,6 +77,7 @@ controlPlane:
     - "@./patches/cluster-apiserver-oidc.sops.yaml"
     - "@./patches/cluster-apiserver-audit.yaml"
     - "@./patches/cluster-scheduler-controller-bind.yaml"
+    - "@./patches/cluster-etcd-metrics.yaml"
     - "@./patches/machine-kubelet.yaml"
 
 worker:
