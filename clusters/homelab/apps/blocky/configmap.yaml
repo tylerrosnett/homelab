@@ -37,6 +37,8 @@ data:
       mapping:
         arboretumlab.com: 10.10.100.10
         100.10.10.in-addr.arpa: 10.10.100.10
+        home.tylerrosnett.com: 10.10.10.1
+        10.10.in-addr.arpa: 10.10.10.1
 
     caching:
       prefetching: true
