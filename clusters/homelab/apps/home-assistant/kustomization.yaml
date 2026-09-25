@@ -8,3 +8,6 @@ resources:
   - httproute.yaml
   - servicemonitor.yaml
   - secrets/prometheus-token.sops.yaml
+  - matter-server-pvc.yaml
+  - matter-server-deployment.yaml
+  - matter-server-service.yaml

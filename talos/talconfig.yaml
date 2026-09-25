@@ -93,3 +93,4 @@ worker:
 patches:
   - "@./patches/machine-time.yaml"
   - "@./patches/machine-longhorn.yaml"
+  - "@./patches/machine-sysctls-thread.yaml"

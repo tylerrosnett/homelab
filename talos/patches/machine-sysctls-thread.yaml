@@ -1,0 +1,11 @@
+# Thread reachability for the Matter server (hostNetwork on these nodes).
+#
+# The SLZB-MR1U's OpenThread border router advertises the Thread mesh's IPv6 prefix on
+# Trusted through router advertisements carrying an RFC 4191 route-info option. A host
+# with IPv6 forwarding enabled (every Kubernetes node) ignores RAs unless accept_ra=2,
+# and ignores the route-info option until accept_ra_rt_info_max_plen is raised to 64.
+# Without both, a Matter-over-Thread device commissions and is then unreachable.
+machine:
+  sysctls:
+    net.ipv6.conf.eno1.accept_ra: "2"
+    net.ipv6.conf.eno1.accept_ra_rt_info_max_plen: "64"

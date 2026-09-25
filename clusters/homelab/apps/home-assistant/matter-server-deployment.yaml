@@ -1,0 +1,74 @@
+# Matter controller for Home Assistant (matter.js-based drop-in for python-matter-server).
+# hostNetwork: Matter is IPv6 link-local + mDNS on Trusted, and Thread devices are reached
+# through the SLZB-MR1U border router via RA-learned routes (see talos/patches/machine-sysctls-thread.yaml).
+# The /data PVC is the fabric identity: losing it means re-commissioning every Matter device.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matter-server
+  namespace: home-assistant
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: matter-server
+  template:
+    metadata:
+      labels:
+        app: matter-server
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: matter-server
+          image: ghcr.io/matter-js/matterjs-server:1.4.0
+          env:
+            - name: STORAGE_PATH
+              value: /data
+            - name: PORT
+              value: "5580"
+            - name: PRIMARY_INTERFACE
+              value: eno1
+            - name: LOG_LEVEL
+              value: info
+            - name: NODE_OPTIONS
+              value: --max-old-space-size=512
+          ports:
+            - name: ws
+              containerPort: 5580
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            tcpSocket:
+              port: ws
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: ws
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: matter-server-data
