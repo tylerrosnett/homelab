@@ -1,0 +1,90 @@
+# Zigbee2MQTT: talks to the SLZB-MR1U's Zigbee radio over TCP (no serial device, no
+# hostNetwork needed) and publishes devices to Mosquitto with HA discovery enabled.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zigbee2mqtt
+  namespace: home-assistant
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: zigbee2mqtt
+  template:
+    metadata:
+      labels:
+        app: zigbee2mqtt
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: seed-config
+          image: ghcr.io/koenkk/zigbee2mqtt:2.14.1
+          command:
+            - sh
+            - -c
+            - '[ -f /app/data/configuration.yaml ] || cp /seed/configuration.yaml /app/data/configuration.yaml'
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+          volumeMounts:
+            - name: seed
+              mountPath: /seed
+              readOnly: true
+            - name: data
+              mountPath: /app/data
+      containers:
+        - name: zigbee2mqtt
+          image: ghcr.io/koenkk/zigbee2mqtt:2.14.1
+          env:
+            - name: TZ
+              value: America/Chicago
+            - name: ZIGBEE2MQTT_DATA
+              value: /app/data
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: seed
+          configMap:
+            name: zigbee2mqtt-seed
+        - name: data
+          persistentVolumeClaim:
+            claimName: zigbee2mqtt-data

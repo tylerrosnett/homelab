@@ -1,0 +1,15 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zigbee2mqtt
+  namespace: home-assistant
+spec:
+  parentRefs:
+    - name: cilium-gateway
+      namespace: kube-system
+  hostnames:
+    - z2m.internal.tylerrosnett.com
+  rules:
+    - backendRefs:
+        - name: zigbee2mqtt
+          port: 8080

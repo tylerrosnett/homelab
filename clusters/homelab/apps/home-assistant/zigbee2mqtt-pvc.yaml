@@ -1,0 +1,14 @@
+# Holds configuration.yaml (network key, pan_id), database.db (paired devices) and
+# coordinator backup. Losing it means re-pairing every Zigbee device.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zigbee2mqtt-data
+  namespace: home-assistant
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
