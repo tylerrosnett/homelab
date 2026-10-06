@@ -2,7 +2,7 @@ clusterName: homelab
 endpoint: https://10.10.10.246:6443  # Talos VIP
 
 talosVersion: v1.14.1
-kubernetesVersion: v1.36.4
+kubernetesVersion: v1.36.5
 
 cniConfig:
   name: none  # Cilium installed out-of-band
