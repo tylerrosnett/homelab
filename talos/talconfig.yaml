@@ -1,7 +1,7 @@
 clusterName: homelab
 endpoint: https://10.10.10.246:6443  # Talos VIP
 
-talosVersion: v1.14.1
+talosVersion: v1.14.2
 kubernetesVersion: v1.36.5
 
 cniConfig:
