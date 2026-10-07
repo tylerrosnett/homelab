@@ -1,0 +1,32 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: garage-ingress
+  namespace: storage
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: garage
+  ingress:
+    # Gateway (cf-tunnel / cilium-gateway envoy on hostNetwork) to the S3 API
+    - fromEntities:
+        - ingress
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "3900"
+              protocol: TCP
+    # Prometheus scrapes the admin port
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: prometheus
+            io.kubernetes.pod.namespace: monitoring
+      toPorts:
+        - ports:
+            - port: "3903"
+              protocol: TCP
+    # One-off migration pods (bootstrap CORS, rclone copy) carry this label
+    - fromEndpoints:
+        - matchLabels:
+            migration: garage

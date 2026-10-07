@@ -1,0 +1,106 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: garage
+  namespace: storage
+spec:
+  driftDetection:
+    mode: enabled
+  interval: 30m
+  chart:
+    spec:
+      chart: ./script/helm/garage
+      sourceRef:
+        kind: GitRepository
+        name: garage
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    garage:
+      singleNode: true
+      dbEngine: lmdb
+      existingRpcSecret: garage-rpc-secret
+      s3:
+        api:
+          region: garage
+          rootDomain: ""
+    deployment:
+      kind: StatefulSet
+      replicaCount: 1
+    persistence:
+      enabled: true
+      meta:
+        storageClass: longhorn
+        size: 1Gi
+      data:
+        storageClass: longhorn
+        size: 20Gi
+    image:
+      repository: dxflrs/amd64_garage
+      tag: v2.4.1
+    initImage:
+      repository: busybox
+      tag: 1.37.0
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 3903
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    readinessProbe:
+      httpGet:
+        path: /health
+        port: 3903
+      periodSeconds: 10
+    podSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      fsGroupChangePolicy: OnRootMismatch
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+    monitoring:
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+          labels:
+            release: kube-prometheus-stack
+  postRenderers:
+    # The chart's init container declares no resources; Kyverno require-requests
+    # checks initContainers too and would deny the pod.
+    - kustomize:
+        patches:
+          - target:
+              kind: StatefulSet
+              name: garage
+            patch: |
+              apiVersion: apps/v1
+              kind: StatefulSet
+              metadata:
+                name: garage
+              spec:
+                template:
+                  spec:
+                    initContainers:
+                      - name: garage-init
+                        resources:
+                          requests:
+                            cpu: 10m
+                            memory: 16Mi

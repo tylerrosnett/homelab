@@ -1,0 +1,23 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: garage
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: gateway
+    - name: longhorn
+    - name: minio
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  interval: 30m
+  retryInterval: 1m
+  timeout: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/homelab/storage/garage
+  prune: true
+  wait: true
