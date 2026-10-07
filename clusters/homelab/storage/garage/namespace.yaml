@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: storage
+  # Never garbage-collected by Flux, whichever Kustomization applies it.
+  # Added when ownership moved from the minio Kustomization to garage:
+  # deleting a Kustomization prunes its whole inventory, and pruning this
+  # Namespace would take Garage and its PVCs with it.
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+  labels:
+    expose-public: "true"
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest

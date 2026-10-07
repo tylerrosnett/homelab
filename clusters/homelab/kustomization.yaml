@@ -8,7 +8,6 @@ resources:
   - platform/crossplane-providers.yaml
   - platform/crossplane-provider-config.yaml
   - cloudflare/dns.yaml
-  - cloudflare/rulesets.yaml
   - network/gateway-api.yaml
   - network/cilium.yaml
   - network/cilium-loadbalancer.yaml
@@ -22,7 +21,6 @@ resources:
   - network/tailscale.yaml
   - network/tailscale-connectors.yaml
   - storage/longhorn.yaml
-  - storage/minio.yaml
   - storage/garage.yaml
   - observability/kube-prometheus-stack.yaml
   - observability/loki.yaml

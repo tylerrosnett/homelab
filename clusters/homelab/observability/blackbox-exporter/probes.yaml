@@ -41,7 +41,6 @@ spec:
         - https://headlamp.internal.tylerrosnett.com
         - https://hubble.internal.tylerrosnett.com
         - https://homeassistant.internal.tylerrosnett.com
-        - https://minio.internal.tylerrosnett.com
         - https://flux.internal.tylerrosnett.com
       labels:
         category: internal

@@ -7,7 +7,6 @@ spec:
   dependsOn:
     - name: gateway
     - name: longhorn
-    - name: minio
   decryption:
     provider: sops
     secretRef:
