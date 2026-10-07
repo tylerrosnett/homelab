@@ -22,7 +22,7 @@ spec:
       retries: 3
   values:
     garage:
-      singleNode: true
+      replicationFactor: "1"
       dbEngine: lmdb
       existingRpcSecret: garage-rpc-secret
       s3:
