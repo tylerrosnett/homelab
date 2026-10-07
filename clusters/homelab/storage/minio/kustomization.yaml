@@ -5,6 +5,5 @@ resources:
   - repository.yaml
   - secrets/minio.sops.yaml
   - helmrelease.yaml
-  - httproute.yaml
   - httproute-console.yaml
   - networkpolicy.yaml

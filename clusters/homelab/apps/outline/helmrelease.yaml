@@ -92,10 +92,9 @@ spec:
         accessKeyIdSecretKey: access-key-id
         secretAccessKeySecretKey: secret-access-key
         bucket: outline
-        region: us-east-1
+        region: garage
         bucketUrl: https://files.tylerrosnett.com
         forcePathStyle: true
-        acl: private
     secretKeyExternalSecret:
       name: outline-secrets
       key: secret-key
