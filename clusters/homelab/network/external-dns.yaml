@@ -6,6 +6,7 @@ metadata:
 spec:
   dependsOn:
     - name: gateway
+    - name: external-dns-crds
   decryption:
     provider: sops
     secretRef:

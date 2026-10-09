@@ -6,6 +6,8 @@ metadata:
 spec:
   dependsOn:
     - name: crossplane-provider-config
+    - name: external-dns-crds
+    - name: external-dns
   interval: 10m
   retryInterval: 1m
   timeout: 5m

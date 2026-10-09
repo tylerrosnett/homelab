@@ -1,0 +1,38 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: external-dns
+  namespace: flux-system
+spec:
+  interval: 12h
+  url: https://github.com/kubernetes-sigs/external-dns
+  ref:
+    # The external-dns app version the chart ships (chart 1.23.0 -> v0.23.0).
+    # Renovate groups this tag with the chart bump in one PR (renovate.json,
+    # group "external-dns"); the tag may run a release ahead of the chart.
+    tag: v0.23.0
+  ignore: |
+    # artifact only needs the DNSEndpoint CRD
+    /*
+    !/config/crd/
+    # dnsrecords is the CRD-backed registry, not used here (registry is txt)
+    /config/crd/standard/dnsrecords.externaldns.k8s.io.yaml
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: external-dns-crds
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  sourceRef:
+    kind: GitRepository
+    name: external-dns
+  path: ./config/crd/standard
+  # prune stays off for the same reason as gateway-api: pruning the CRD
+  # cascade-deletes every DNSEndpoint, and ExternalDNS (policy: sync) would then
+  # delete the mail and wildcard records from Cloudflare.
+  prune: false
+  wait: true

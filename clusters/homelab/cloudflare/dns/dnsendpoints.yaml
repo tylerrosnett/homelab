@@ -1,0 +1,60 @@
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: proton-mail
+  namespace: external-dns
+spec:
+  endpoints:
+    - dnsName: tylerrosnett.com
+      recordType: MX
+      targets:
+        - "10 mail.protonmail.ch"
+        - "20 mailsec.protonmail.ch"
+    # Apex TXT is one record set, so everything at this name has to live here.
+    # The Google site verification was hand-created in Cloudflare and never in
+    # git before; ExternalDNS cannot share the name with a record it does not
+    # own, so it moved into git with the rest.
+    - dnsName: tylerrosnett.com
+      recordType: TXT
+      targets:
+        - '"v=spf1 include:_spf.protonmail.ch ~all"'
+        - '"protonmail-verification=e7ce0bdfb89b9a3a2c64769683ef3c7d95b30220"'
+        - '"google-site-verification=4r8eJaj0pwTONMc1XI6zlkbvd12voX1OMu7SxoUPP08"'
+    - dnsName: _dmarc.tylerrosnett.com
+      recordType: TXT
+      targets:
+        - '"v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s;"'
+    - dnsName: protonmail._domainkey.tylerrosnett.com
+      recordType: CNAME
+      targets:
+        - protonmail.domainkey.dowhakva4h3utg2kfhm36fsuxgdsk77zmv6canv5vo7glrkr5udhq.domains.proton.ch
+    - dnsName: protonmail2._domainkey.tylerrosnett.com
+      recordType: CNAME
+      targets:
+        - protonmail2.domainkey.dowhakva4h3utg2kfhm36fsuxgdsk77zmv6canv5vo7glrkr5udhq.domains.proton.ch
+    - dnsName: protonmail3._domainkey.tylerrosnett.com
+      recordType: CNAME
+      targets:
+        - protonmail3.domainkey.dowhakva4h3utg2kfhm36fsuxgdsk77zmv6canv5vo7glrkr5udhq.domains.proton.ch
+    # Any selector other than Proton's three gets an empty DKIM key.
+    - dnsName: "*._domainkey.tylerrosnett.com"
+      recordType: TXT
+      targets:
+        - '"v=DKIM1; p="'
+---
+# *.tylerrosnett.com -> Cloudflare Tunnel. Every public HTTPRoute on cf-tunnel
+# resolves through this one proxied CNAME; new public apps need no DNS work.
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: wildcard-tylerrosnett
+  namespace: external-dns
+spec:
+  endpoints:
+    - dnsName: "*.tylerrosnett.com"
+      recordType: CNAME
+      targets:
+        - 705038a6-3c96-4250-97c6-b0ad6439f62e.cfargotunnel.com
+      providerSpecific:
+        - name: cloudflare/proxied
+          value: "true"

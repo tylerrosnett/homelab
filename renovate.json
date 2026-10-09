@@ -86,6 +86,14 @@
       "dependencyDashboardApproval": true
     },
     {
+      "description": "Group the external-dns chart with the external-dns GitRepository tag that supplies the DNSEndpoint CRD (chart 1.x.0 ships app v0.x.0; the chart usually trails the tag by days, so a grouped PR may carry the tag alone)",
+      "matchPackageNames": [
+        "external-dns",
+        "https://github.com/kubernetes-sigs/external-dns"
+      ],
+      "groupName": "external-dns"
+    },
+    {
       "description": "Gateway API CRDs come straight from the upstream repo via the gateway-api GitRepository",
       "matchDatasources": ["git-tags"],
       "matchPackageNames": ["https://github.com/kubernetes-sigs/gateway-api"],

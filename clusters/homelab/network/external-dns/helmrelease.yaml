@@ -32,14 +32,40 @@ spec:
             key: api-token
     sources:
       - gateway-httproute
+      # DNSEndpoint CRs in clusters/homelab/cloudflare/dns/ (mail + wildcard
+      # records). The chart adds the dnsendpoints RBAC when "crd" is listed.
+      - crd
+    # Default is A/AAAA/CNAME; the mail records need MX and TXT.
+    managedRecordTypes:
+      - A
+      - AAAA
+      - CNAME
+      - MX
+      - TXT
     domainFilters:
       - tylerrosnett.com
     extraArgs:
-      - --regex-domain-filter=^(tylerrosnett\.com|.+\.internal\.tylerrosnett\.com)$
+      # Apex (zone discovery + mail records), *.internal.* (HTTPRoutes on the
+      # internal gateway), the mail subdomains, and the literal "*" wildcard.
+      # Deliberately NOT .+\.tylerrosnett\.com: the public HTTPRoutes on
+      # cf-tunnel must stay covered by the wildcard CNAME, not get A records
+      # for the unannounced 10.10.10.201 LB IP.
+      - --regex-domain-filter=^(tylerrosnett\.com|.+\.internal\.tylerrosnett\.com|_dmarc\.tylerrosnett\.com|.+\._domainkey\.tylerrosnett\.com|\*\.tylerrosnett\.com)$
+      # Ownership TXT for "*.tylerrosnett.com" becomes edns-cname.wildcard.tylerrosnett.com
+      - --txt-wildcard-replacement=wildcard
     policy: sync
     registry: txt
     txtOwnerId: homelab
-    txtPrefix: edns-
+    # The ownership record is <prefix><first-label>.<rest>. Without the record
+    # type in the prefix, external-dns prepends "<type>-" to the first label, so
+    # the apex would become edns-mx-tylerrosnett.com: outside the zone, and
+    # Cloudflare rejects it. With the type in the prefix and a trailing dot the
+    # first label is kept and the marker lands inside the zone:
+    #   tylerrosnett.com (MX)              -> edns-mx.tylerrosnett.com
+    #   whoami.internal.tylerrosnett.com   -> edns-a.whoami.internal.tylerrosnett.com
+    # Changing this orphans every marker written under the old "edns-" prefix;
+    # those records and their markers were deleted by hand once and recreated.
+    txtPrefix: "edns-%{record_type}."
     interval: 1m
     logLevel: info
     serviceMonitor:
