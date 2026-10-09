@@ -17,7 +17,7 @@ The stack: [Talos Linux](https://www.talos.dev/) for the OS (immutable, API-driv
 | CNI | Cilium (kube-proxy replacement, eBPF, L2 announcements, apiserver via KubePrism) |
 | Storage | Longhorn (3 replicas, default StorageClass) |
 | Certs | cert-manager + Let's Encrypt (DNS01 via Cloudflare) |
-| DNS | ExternalDNS → Cloudflare (internal hostnames only) |
+| DNS | ExternalDNS → Cloudflare (internal hostnames from HTTPRoutes, mail and wildcard records from DNSEndpoint CRs) |
 | Ad-blocking | Blocky — LAN DNS resolver at `10.10.10.202`, handed out by UniFi DHCP; forwards `arboretumlab.com` to bonsai |
 | Ingress | Cilium Gateway API — internal gateway on LAN, public gateway behind cloudflared |
 | Observability | kube-prometheus-stack, Loki single-binary, Grafana Alloy DaemonSet, Hubble UI |
@@ -33,14 +33,11 @@ The stack: [Talos Linux](https://www.talos.dev/) for the OS (immutable, API-driv
 talos/                              Talos node config via talhelper (single source of truth)
 clusters/homelab/
   flux-system/                      Flux operator + FluxInstance bootstrap
-  platform/
-    crossplane/                     Crossplane HelmRelease
-    crossplane-providers/           Cloudflare providers (dns, zone, access, zero-trust)
-    crossplane-provider-config/     ClusterProviderConfig + Cloudflare API token (SOPS)
   cloudflare/
-    dns/                            DNS records as Crossplane CRs (email, wildcard)
+    dns/                            Mail + wildcard DNS records as ExternalDNS DNSEndpoint CRs
   network/
     gateway-api.yaml                Gateway API CRDs from upstream (tag-pinned GitRepository)
+    external-dns-crds.yaml          ExternalDNS DNSEndpoint CRD from upstream (tag-pinned GitRepository)
     cilium/                         Cilium HelmRelease
     cilium-loadbalancer/            IP pool + L2 announcement policy
     gateway/                        Internal + public Gateway resources
@@ -225,6 +222,6 @@ rm -rf ~/.kube/cache/oidc-login/
 - **Cilium installed out-of-band** via Flux HelmRelease (Talos CNI is `none`). kube-proxy is disabled; Cilium's BPF kube-proxy replacement handles it.
 - **Install disks selected by size/type** (`installDiskSelector: size: '>= 200GB', type: ssd`), not fixed `/dev/sdX` paths — names aren't stable across reboots when USB media is present.
 - **flux-operator + FluxInstance** instead of the classic `flux install`. The FluxInstance is itself reconciled by a Flux HelmRelease for self-management.
-- **Two ExternalDNS scopes**: domain filter set to `tylerrosnett.com` (zone discovery requires it), regex filter `^(tylerrosnett\.com|.+\.internal\.tylerrosnett\.com)$` matches both the zone apex (so ExternalDNS can discover the hosted zone) AND the internal records it should manage. The zone apex match is required — without it, ExternalDNS silently skips every record with "no hosted zone matching record DNS Name was detected".
+- **Two ExternalDNS scopes**: domain filter set to `tylerrosnett.com` (zone discovery requires it), and a regex filter that admits the zone apex, `*.internal.*`, the mail subdomains and the literal `*` wildcard. The apex match is required — without it, ExternalDNS silently skips every record with "no hosted zone matching record DNS Name was detected". The regex deliberately excludes `<app>.tylerrosnett.com`, so public HTTPRoutes on `cf-tunnel` resolve through the wildcard CNAME rather than getting A records for the unannounced LB IP.
 - **Public traffic terminates plaintext inside the cluster** (Cloudflare → cloudflared → public gateway is HTTP). Cilium's identity-aware policy on backend pods uses the `ingress` entity to allow only envoy-originated traffic.
 - **Talos kube-controller-manager and kube-scheduler bind to 0.0.0.0** via `patches/cluster-scheduler-controller-bind.yaml`. Default Talos behavior binds them to 127.0.0.1, so Prometheus scrapes via node IP fail. Without the patch you get perpetual `KubeSchedulerInstanceUnreachable` / `KubeControllerManagerInstanceUnreachable` / `TargetDown` alerts.

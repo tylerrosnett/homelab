@@ -13,7 +13,7 @@ permissions:
 env:
   # renovate: datasource=github-releases depName=yannh/kubeconform
   KUBECONFORM_VERSION: v0.8.0
-  # Built-in Kubernetes schemas cover core/apps/etc; the CRD catalog covers Flux, Gateway API, Cilium, Prometheus Operator, cert-manager, Crossplane, Tailscale.
+  # Built-in Kubernetes schemas cover core/apps/etc; the CRD catalog covers Flux, Gateway API, Cilium, Prometheus Operator, cert-manager, ExternalDNS, Tailscale.
   CRDS_CATALOG: "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
 
 jobs:

@@ -1,6 +1,0 @@
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-cloudflare-dns
-spec:
-  package: xpkg.upbound.io/wildbitca/provider-cloudflare-dns:v0.2.5

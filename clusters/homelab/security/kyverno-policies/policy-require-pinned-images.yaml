@@ -19,7 +19,6 @@ spec:
         - flux-system
         - longhorn-system
         - monitoring
-        - crossplane-system
         - tailscale
         - cert-manager
         - kyverno

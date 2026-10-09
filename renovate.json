@@ -25,9 +25,6 @@
   "kubernetes": {
     "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"]
   },
-  "crossplane": {
-    "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"]
-  },
   "packageRules": [
     {
       "description": "Group all kube-prometheus-stack updates",
@@ -51,12 +48,6 @@
         "ghcr.io/controlplaneio-fluxcd/charts/flux-operator"
       ],
       "groupName": "flux"
-    },
-    {
-      "description": "Group the four Crossplane Cloudflare providers so they bump in lockstep",
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["xpkg.upbound.io/wildbitca/**"],
-      "groupName": "crossplane-cloudflare-providers"
     },
     {
       "description": "Major updates wait for Dependency Dashboard approval",
