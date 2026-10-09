@@ -6,14 +6,17 @@ metadata:
 spec:
   endpoints:
     - dnsName: tylerrosnett.com
+      recordType: AAAA
+      targets:
+        - "100::"
+      providerSpecific:
+        - name: cloudflare/proxied
+          value: "true"
+    - dnsName: tylerrosnett.com
       recordType: MX
       targets:
         - "10 mail.protonmail.ch"
         - "20 mailsec.protonmail.ch"
-    # Apex TXT is one record set, so everything at this name has to live here.
-    # The Google site verification was hand-created in Cloudflare and never in
-    # git before; ExternalDNS cannot share the name with a record it does not
-    # own, so it moved into git with the rest.
     - dnsName: tylerrosnett.com
       recordType: TXT
       targets:
@@ -42,8 +45,6 @@ spec:
       targets:
         - '"v=DKIM1; p="'
 ---
-# *.tylerrosnett.com -> Cloudflare Tunnel. Every public HTTPRoute on cf-tunnel
-# resolves through this one proxied CNAME; new public apps need no DNS work.
 apiVersion: externaldns.k8s.io/v1alpha1
 kind: DNSEndpoint
 metadata:
