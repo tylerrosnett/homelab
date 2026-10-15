@@ -31,7 +31,7 @@ Each subsystem follows the pattern: a directory with raw manifests + `kustomizat
 - **Versions live in `talos/talconfig.yaml` and Renovate bumps them — read the file, don't trust a number written here.** Note that merging a Renovate Talos/k8s PR changes only git; the rollout (`talhelper genconfig` + `talosctl upgrade`) is manual and has historically lagged.
 - CNI is `none` in Talos config — **Cilium is installed out-of-band**, so any networking work must account for Cilium being the actual CNI.
 - `kube-proxy` is disabled (Cilium kube-proxy replacement expected). Cilium reaches the apiserver via **KubePrism** (`localhost:7445`), not the VIP: Talos moves the VIP on etcd health, not apiserver health, so a node with healthy etcd and a sick apiserver could otherwise stall every agent.
-- Install disk on every node is selected by `installDiskSelector` (`size: '>= 200GB', type: ssd`) rather than a fixed `/dev/sdX` path — block device names aren't stable across reboots when USB media is present. Proxmox virtual disks need "SSD emulation" ticked for `type: ssd` to match. System extensions: `iscsi-tools`, `util-linux-tools` everywhere, plus `qemu-guest-agent` on workers.
+- Every node is a Lenovo ThinkCentre M700 Tiny (10HY001RUS) with two SATA disks; the M.2 slot has no PCIe lanes, so NVMe parts never show up. Since 2026-10-15: the 240 GB Intel D3-S4510 M.2 (`INTEL SSDSCKKB24`, power-loss protection) is the Talos system disk, selected by `installDiskSelector.model` rather than size (both disks exceed 200 GB), so etcd fsyncs land on the PLP drive (p99 went from 6-10 ms to under 2 ms). The original 256 GB `SATA SSD` holds a single Talos `UserVolumeConfig` named `longhorn` (`talos/patches/machine-longhorn-volume.yaml`, xfs, mounted at `/var/mnt/longhorn` with an `rshared` kubelet bind) and nothing else; Longhorn's `defaultDataPath` points there. Longhorn node records were switched to that path by hand on each node (patch disks, delete stuck replica records, remove the default disk); they live outside git. System extensions: `iscsi-tools`, `util-linux-tools`.
 - Kubelet uses `rotate-server-certificates: true`.
 - The apiserver audit policy logs Secrets at **`Metadata`** level, deliberately. `RequestResponse` would write every SOPS-decrypted value Flux applies into the node audit log in plaintext — and Alloy tails that log into Loki. Don't raise it.
 
@@ -40,7 +40,7 @@ Each subsystem follows the pattern: a directory with raw manifests + `kustomizat
 Talos config workflow (run from `talos/`):
 
 ```bash
-talhelper genconfig                                                # regenerate ./clusterconfig/ (gitignored)
+talhelper genconfig && sed -i '' 's/- name: key1/- name: key2/' clusterconfig/homelab-*.yaml   # regenerate (gitignored); the sed is mandatory while talhelper <= 3.1.17 emits secretbox key1 — cluster data is under key2
 talosctl disks --insecure --nodes <node-ip>                        # confirm disk name before apply
 talosctl apply-config --insecure --nodes <ip> --file ./clusterconfig/<hostname>.yaml
 talosctl bootstrap --nodes 10.10.10.5                             # ONCE, after all 3 nodes are up

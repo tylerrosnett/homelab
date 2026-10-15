@@ -16,8 +16,7 @@ nodes:
   - hostname: oak
     ipAddress: 10.10.10.5
     installDiskSelector:
-      size: '>= 200GB'
-      type: ssd
+      model: INTEL SSDSCKKB24  # M.2 PLP drive: system disk + etcd
     controlPlane: true
     networkInterfaces:
       - interface: eno1
@@ -33,8 +32,7 @@ nodes:
   - hostname: maple
     ipAddress: 10.10.10.6
     installDiskSelector:
-      size: '>= 200GB'
-      type: ssd
+      model: INTEL SSDSCKKB24  # M.2 PLP drive: system disk + etcd
     controlPlane: true
     networkInterfaces:
       - interface: eno1
@@ -50,8 +48,7 @@ nodes:
   - hostname: pine
     ipAddress: 10.10.10.7
     installDiskSelector:
-      size: '>= 200GB'
-      type: ssd
+      model: INTEL SSDSCKKB24  # M.2 PLP drive: system disk + etcd
     controlPlane: true
     networkInterfaces:
       - interface: eno1
@@ -92,5 +89,5 @@ worker:
 
 patches:
   - "@./patches/machine-time.yaml"
-  - "@./patches/machine-longhorn.yaml"
+  - "@./patches/machine-longhorn-volume.yaml"
   - "@./patches/machine-sysctls-thread.yaml"

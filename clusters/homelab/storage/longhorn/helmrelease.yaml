@@ -25,7 +25,7 @@ spec:
       retries: 3
   values:
     defaultSettings:
-      defaultDataPath: /var/lib/longhorn
+      defaultDataPath: /var/mnt/longhorn  # Talos UserVolume; unconverted nodes keep /var/lib/longhorn
       defaultReplicaCount: 3
     persistence:
       defaultClass: true
