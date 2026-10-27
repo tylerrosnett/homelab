@@ -10,7 +10,7 @@ spec:
     # The external-dns app version the chart ships (chart 1.23.0 -> v0.23.0).
     # Renovate groups this tag with the chart bump in one PR (renovate.json,
     # group "external-dns"); the tag may run a release ahead of the chart.
-    tag: v0.23.0
+    tag: v0.24.0
   ignore: |
     # artifact only needs the DNSEndpoint CRD
     /*
