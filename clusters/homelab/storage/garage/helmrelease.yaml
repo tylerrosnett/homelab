@@ -42,7 +42,7 @@ spec:
         size: 20Gi
     image:
       repository: dxflrs/amd64_garage
-      tag: v2.4.1
+      tag: v2.5.0
     initImage:
       repository: busybox
       tag: 1.38.0
