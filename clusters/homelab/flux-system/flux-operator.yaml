@@ -22,7 +22,7 @@ spec:
           # with no PR and no git record of the running version. Renovate bumps this via the
           # flux-operator-version customManager in renovate.json (the flux manager can't see
           # OCIRepositories nested inside a ResourceSet).
-          tag: "0.58.0"
+          tag: "0.62.1"
     - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease
       metadata:
