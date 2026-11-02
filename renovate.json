@@ -15,6 +15,7 @@
   "labels": ["dependencies"],
   "assignees": ["tylerrosnett"],
   "minimumReleaseAge": "3 days",
+  "minimumReleaseAgeBehaviour": "timestamp-optional",
   "osvVulnerabilityAlerts": true,
   "flux": {
     "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"]
