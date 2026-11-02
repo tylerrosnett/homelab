@@ -9,9 +9,8 @@
     "helpers:pinGitHubActionDigests"
   ],
   "timezone": "America/Los_Angeles",
-  "schedule": ["* 18-23,0-4 * * 1-5", "* * * * 0,6"],
-  "prHourlyLimit": 4,
-  "prConcurrentLimit": 10,
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 0,
   "labels": ["dependencies"],
   "assignees": ["tylerrosnett"],
   "minimumReleaseAge": "3 days",
