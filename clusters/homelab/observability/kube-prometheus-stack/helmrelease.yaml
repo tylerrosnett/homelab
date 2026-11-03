@@ -40,14 +40,12 @@ spec:
         targetPort: 10257
       serviceMonitor:
         https: true
-        insecureSkipVerify: true
     kubeScheduler:
       service:
         port: 10259
         targetPort: 10259
       serviceMonitor:
         https: true
-        insecureSkipVerify: true
     kubeEtcd:
       endpoints:
         - 10.10.10.5
