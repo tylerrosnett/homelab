@@ -30,7 +30,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: matter-server
-          image: ghcr.io/matter-js/matterjs-server:1.4.0
+          image: ghcr.io/matter-js/matterjs-server:1.5.5
           env:
             - name: STORAGE_PATH
               value: /data
