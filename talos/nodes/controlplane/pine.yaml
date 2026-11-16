@@ -1,0 +1,16 @@
+machine:
+  network:
+    hostname: pine
+    interfaces:
+      - interface: eno1
+        dhcp: false
+        addresses:
+          - 10.10.10.7/24
+        routes:
+          - network: 0.0.0.0/0
+            gateway: 10.10.10.1
+        vip:
+          ip: 10.10.10.246
+  install:
+    diskSelector:
+      model: INTEL SSDSCKKB24

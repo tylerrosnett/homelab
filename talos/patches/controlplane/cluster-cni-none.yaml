@@ -1,0 +1,4 @@
+# Cilium is installed by Flux; Talos must not deploy its default CNI.
+apiVersion: v1alpha1
+kind: KubeFlannelCNIConfig
+$patch: delete

@@ -69,12 +69,12 @@ controlPlane:
           - siderolabs/iscsi-tools
           - siderolabs/util-linux-tools
   patches:
-    - "@./patches/cluster-proxy-disabled.yaml"
-    - "@./patches/cluster-apiserver-oidc.sops.yaml"
-    - "@./patches/cluster-apiserver-audit.yaml"
-    - "@./patches/cluster-scheduler-controller-bind.yaml"
-    - "@./patches/cluster-etcd-metrics.yaml"
-    - "@./patches/machine-kubelet.yaml"
+    - "@./patches/controlplane/cluster-proxy-disabled.yaml"
+    - "@./patches/controlplane/cluster-apiserver-oidc.sops.yaml"
+    - "@./patches/controlplane/cluster-apiserver-audit.yaml"
+    - "@./patches/controlplane/cluster-scheduler-controller-bind.yaml"
+    - "@./patches/controlplane/cluster-etcd-metrics.yaml"
+    - "@./patches/controlplane/machine-kubelet.yaml"
 
 worker:
   schematic:
@@ -85,9 +85,9 @@ worker:
           - siderolabs/util-linux-tools
           - siderolabs/qemu-guest-agent
   patches:
-    - "@./patches/machine-kubelet.yaml"
+    - "@./patches/worker/machine-kubelet.yaml"
 
 patches:
-  - "@./patches/machine-time.yaml"
-  - "@./patches/machine-longhorn-volume.yaml"
-  - "@./patches/machine-sysctls-thread.yaml"
+  - "@./patches/all/machine-time.yaml"
+  - "@./patches/all/machine-longhorn-volume.yaml"
+  - "@./patches/all/machine-sysctls-thread.yaml"
