@@ -25,7 +25,7 @@ Each subsystem follows the pattern: a directory with raw manifests + `kustomizat
 
 ## Cluster facts (don't re-derive)
 
-- Controlplane nodes (bare metal, interface `eno1`): `oak` 10.10.10.5, `maple` 10.10.10.6, `pine` 10.10.10.7. Schedulable (`allowSchedulingOnControlPlanes: true`).
+- Controlplane nodes (bare metal, interface `eno1`): `oak` 10.10.10.5, `maple` 10.10.10.6, `pine` 10.10.10.7. Schedulable (the controlplane `KubeNodeConfig` patch sets no control-plane taint).
 - No worker nodes. The Proxmox VM workers `birch` (`homelab/node-class: game`) and `cedar` (`bulk`) were removed on 2026-09-22. Minecraft keeps its `node-class: game` nodeSelector and is scaled to 0 until a game node is added.
 - Kubernetes API VIP: `10.10.10.246` (Talos shared VIP on `eno1`).
 - **Versions live in `talos/versions.env` and Renovate bumps them — read the file, don't trust a number written here.** Note that merging a Renovate Talos/k8s PR changes only git; the rollout (`talos/genconfig.sh` + `talosctl upgrade`) is manual and has historically lagged.
