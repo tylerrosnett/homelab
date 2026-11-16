@@ -1,0 +1,23 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gpu-node-away
+  namespace: gpu-operator
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: gpu-node.rules
+      rules:
+        # Marker only: severity none never reaches Discord. The inhibit rules in
+        # observability/blackbox-exporter/alertmanagerconfig.yaml key off it to
+        # silence the alerts a powered-off willow would otherwise raise. Once the
+        # Node object is deleted the series disappears and so does this alert.
+        - alert: GPUNodeAway
+          expr: kube_node_status_condition{job="kube-state-metrics",node="willow",condition="Ready",status="true"} == 0
+          for: 1m
+          labels:
+            severity: none
+          annotations:
+            summary: "GPU node willow is not Ready (switched off or booted into CachyOS)"
+            description: "Alerts for willow's node, its DaemonSet pods and its scrape targets are inhibited while this fires. Delete the Node object when willow is away on purpose."

@@ -16,6 +16,54 @@ spec:
       - name: severity
         matchType: "=~"
         value: "warning|critical"
+  # While GPUNodeAway fires (gpu/prometheusrule.yaml), silence what a powered-off
+  # willow raises. Most of these alerts carry no node label, so the scoping is by
+  # what runs on willow: anything in gpu-operator, the three DaemonSets that also
+  # run there, and the kubelet/node-exporter scrape jobs. A real failure of those
+  # on another node is hidden too while willow is away.
+  inhibitRules:
+    - sourceMatch:
+        - name: alertname
+          value: GPUNodeAway
+      targetMatch:
+        - name: alertname
+          matchType: "=~"
+          value: "KubeNodeNotReady|KubeNodeUnreachable|KubeNodeReadinessFlapping"
+      equal: ["node"]
+    - sourceMatch:
+        - name: alertname
+          value: GPUNodeAway
+      targetMatch:
+        - name: namespace
+          value: gpu-operator
+    - sourceMatch:
+        - name: alertname
+          value: GPUNodeAway
+      targetMatch:
+        - name: alertname
+          value: TargetDown
+        - name: job
+          matchType: "=~"
+          value: "kubelet|node-exporter"
+    - sourceMatch:
+        - name: alertname
+          value: GPUNodeAway
+      targetMatch:
+        - name: alertname
+          matchType: "=~"
+          value: "KubeDaemonSetRolloutStuck|KubeDaemonSetNotScheduled|KubeDaemonSetMisScheduled"
+        - name: daemonset
+          matchType: "=~"
+          value: "cilium|cilium-envoy|kube-prometheus-stack-prometheus-node-exporter"
+    - sourceMatch:
+        - name: alertname
+          value: GPUNodeAway
+      targetMatch:
+        - name: alertname
+          value: KubePodNotReady
+        - name: pod
+          matchType: "=~"
+          value: "(cilium|cilium-envoy|kube-prometheus-stack-prometheus-node-exporter)-[a-z0-9]{5}"
   receivers:
     - name: discord
       discordConfigs:
