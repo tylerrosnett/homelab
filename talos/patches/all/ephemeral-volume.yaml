@@ -1,0 +1,7 @@
+# Longhorn executes engine binaries from /var/lib/longhorn/engine-binaries, so /var must stay
+# executable. secure: true (the generated default) would add nosuid,nodev,noexec to /var.
+apiVersion: v1alpha1
+kind: VolumeConfig
+name: EPHEMERAL
+mount:
+  secure: false

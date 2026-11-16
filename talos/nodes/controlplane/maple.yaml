@@ -1,16 +1,24 @@
-machine:
-  network:
-    hostname: maple
-    interfaces:
-      - interface: eno1
-        dhcp: false
-        addresses:
-          - 10.10.10.6/24
-        routes:
-          - network: 0.0.0.0/0
-            gateway: 10.10.10.1
-        vip:
-          ip: 10.10.10.246
-  install:
-    diskSelector:
-      model: INTEL SSDSCKKB24
+apiVersion: v1alpha1
+kind: UnattendedInstallConfig
+provisioning:
+  diskSelector:
+    match: 'disk.model == "INTEL SSDSCKKB24"'
+  wipe: false
+---
+apiVersion: v1alpha1
+kind: HostnameConfig
+auto: 'off'
+hostname: maple
+---
+apiVersion: v1alpha1
+kind: Layer2VIPConfig
+name: 10.10.10.246
+link: eno1
+---
+apiVersion: v1alpha1
+kind: LinkConfig
+name: eno1
+addresses:
+  - address: 10.10.10.6/24
+routes:
+  - gateway: 10.10.10.1

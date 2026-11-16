@@ -1,4 +1,4 @@
-machine:
-  kubelet:
-    extraArgs:
-      rotate-server-certificates: true
+apiVersion: v1alpha1
+kind: KubeletConfig
+extraArgs:
+  rotate-server-certificates: "true"
