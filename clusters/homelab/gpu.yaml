@@ -1,0 +1,20 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gpu
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: kube-prometheus-stack   # ServiceMonitor CRD for the DCGM exporter
+    - name: kyverno-policies        # gpu-operator Audit override must exist before its pods
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/homelab/gpu
+  prune: true
+  # wait: false — the GPU node (willow) is a part-time desktop and is often
+  # absent; nothing depends on this Kustomization.
+  wait: false

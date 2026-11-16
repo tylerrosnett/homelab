@@ -26,4 +26,5 @@ resources:
   - observability/flux-monitoring.yaml
   - observability/extra-dashboards.yaml
   - observability/blackbox-exporter.yaml
+  - gpu.yaml
   - apps.yaml

@@ -24,6 +24,7 @@ spec:
         - cert-manager
         - kyverno
         - home-assistant
+        - gpu-operator
   background: true
   failurePolicy: Fail
   rules:
