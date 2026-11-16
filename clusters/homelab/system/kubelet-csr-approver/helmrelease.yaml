@@ -24,7 +24,7 @@ spec:
   values:
     # Anchored exact-match for our node hostnames.
     # Add more here if/when nodes join.
-    providerRegex: '^(oak|maple|pine|birch|cedar)$'
+    providerRegex: '^(oak|maple|pine|willow)$'
     # IP SAN must fall in this prefix list (LAN /24 covers all three node IPs + VIP).
     providerIpPrefixes: '10.10.10.0/24'
     # Homelab has no per-node DNS records; skip the resolve-back check.
