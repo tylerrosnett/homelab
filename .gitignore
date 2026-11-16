@@ -1,6 +1,6 @@
 .secrets
 
-# Talos generated configs (regenerated from talconfig.yaml — never commit)
+# Talos rendered configs and decrypted temp files (talos/genconfig.sh output, never commit)
 talos/clusterconfig/
 
 # age private key

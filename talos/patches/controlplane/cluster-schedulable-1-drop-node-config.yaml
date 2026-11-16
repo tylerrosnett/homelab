@@ -1,0 +1,6 @@
+# Control planes run workloads, so the generated KubeNodeConfig (which taints them
+# NoSchedule) is replaced by the one in cluster-schedulable-2-node-config.yaml.
+# The two files must stay in this name order.
+apiVersion: v1alpha1
+kind: KubeNodeConfig
+$patch: delete

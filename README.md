@@ -13,7 +13,7 @@ The stack: [Talos Linux](https://www.talos.dev/) for the OS (immutable, API-driv
 | Control plane | `oak` (10.10.10.5), `maple` (10.10.10.6), `pine` (10.10.10.7) — schedulable |
 | Workers | none (Proxmox VM workers `birch`/`cedar` removed 2026-09-22) |
 | API VIP | 10.10.10.246 |
-| Talos / Kubernetes | see `talos/talconfig.yaml` — Renovate keeps it current |
+| Talos / Kubernetes | see `talos/versions.env` (Renovate keeps it current) |
 | CNI | Cilium (kube-proxy replacement, eBPF, L2 announcements, apiserver via KubePrism) |
 | Storage | Longhorn (3 replicas, default StorageClass) |
 | Certs | cert-manager + Let's Encrypt (DNS01 via Cloudflare) |
@@ -30,7 +30,7 @@ The stack: [Talos Linux](https://www.talos.dev/) for the OS (immutable, API-driv
 ## Repository layout
 
 ```
-talos/                              Talos node config via talhelper (single source of truth)
+talos/                              Talos node config, rendered with talosctl (see talos/README.md)
 clusters/homelab/
   flux-system/                      Flux operator + FluxInstance bootstrap
   cloudflare/
@@ -168,7 +168,7 @@ KPS values include `alertmanagerConfigSelector: { matchLabels: { alertmanagerCon
 
 The cluster trusts **Cloudflare Access SaaS OIDC** as an identity provider end-to-end. CF Access itself only accepts GitHub OAuth as a login method — email PIN and other IdPs are disabled in Zero Trust settings.
 
-- **kube-apiserver** has `--oidc-issuer-url`, `--oidc-client-id`, `--oidc-username-claim=email` set via a SOPS-encrypted Talos patch (`talos/patches/cluster-apiserver-oidc.sops.yaml`). The Talos rule under `.sops.yaml` for `talos/patches/.*\.sops\.yaml$` decrypts at `talhelper genconfig` time so plaintext stays in gitignored `clusterconfig/`.
+- **kube-apiserver** validates CF Access tokens through a structured `AuthenticationConfiguration` (issuer, client ID as audience, username from `email`), set by a SOPS-encrypted Talos patch (`talos/patches/controlplane/cluster-apiserver-oidc.sops.yaml`). `talos/genconfig.sh` decrypts it while rendering, so the plaintext only lands in the gitignored `clusterconfig/`.
 - **ClusterRoleBinding** at `clusters/homelab/system/cluster-admin-oidc/secrets/clusterrolebinding.sops.yaml` (SOPS-encrypted) maps the CF Access user email → `cluster-admin`.
 - **Headlamp** uses the same SaaS OIDC app via browser flow at `headlamp.internal.tylerrosnett.com/oidc-callback`. Helm values are injected from the encrypted `headlamp-oidc` secret via Flux's `valuesFrom` to work around a chart bug where `secret.create: false` skips OIDC env injection.
 - **kubectl** uses [`kubelogin`](https://github.com/int128/kubelogin) against the same SaaS app with redirect `http://localhost:8000`. The app has **Allow PKCE without Client Secret** on, so kubectl runs as a public client with no secret on disk.
@@ -197,14 +197,15 @@ To create a new one, write the plaintext Secret at its destination, then `sops -
 ## Common operations
 
 ```bash
-# Regenerate Talos configs (in talos/)
-talhelper genconfig
+# Render Talos configs (in talos/)
+./genconfig.sh
 
-# Apply Talos config to a node
-talosctl apply-config --insecure --nodes <ip> --file ./clusterconfig/<hostname>.yaml
+# Preview, then apply, a node's config (in talos/)
+./dryrun.sh <node> <ip>
+talosctl apply-config -n <ip> -e <ip> -f clusterconfig/homelab-<node>.yaml
 
 # Get kubeconfig
-talosctl kubeconfig --nodes 10.10.10.246 --endpoints 10.10.10.246
+talosctl kubeconfig -n 10.10.10.246 -e 10.10.10.246
 
 # Force a Flux reconcile
 flux reconcile kustomization flux-system --with-source

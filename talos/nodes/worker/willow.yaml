@@ -1,0 +1,53 @@
+# The size bound keeps the installer off the 1 TB Samsung (CachyOS) even if the model match
+# were ever wrong; both conditions must fail to hit it. Installing Talos wipes the whole
+# selected disk, and wipe: false does not prevent that.
+apiVersion: v1alpha1
+kind: UnattendedInstallConfig
+provisioning:
+  diskSelector:
+    match: 'disk.model == "WDC WDS256G1X0C-00ENX0" && disk.size <= 300u * GB'
+  wipe: false
+---
+apiVersion: v1alpha1
+kind: HostnameConfig
+auto: 'off'
+hostname: willow
+---
+apiVersion: v1alpha1
+kind: LinkAliasConfig
+name: lan
+selector:
+  match: 'link.driver == "igc"'
+---
+apiVersion: v1alpha1
+kind: LinkConfig
+name: lan
+addresses:
+  - address: 10.10.10.8/24
+routes:
+  - gateway: 10.10.10.1
+---
+apiVersion: v1alpha1
+kind: KernelModuleConfig
+name: nvidia
+---
+apiVersion: v1alpha1
+kind: KernelModuleConfig
+name: nvidia_uvm
+---
+apiVersion: v1alpha1
+kind: KernelModuleConfig
+name: nvidia_drm
+---
+apiVersion: v1alpha1
+kind: KernelModuleConfig
+name: nvidia_modeset
+---
+# A worker cannot change its own taints after joining, so the taint must be present on the
+# first apply.
+apiVersion: v1alpha1
+kind: KubeNodeConfig
+labels:
+  homelab/node-class: gpu
+taints:
+  nvidia.com/gpu: present:NoSchedule

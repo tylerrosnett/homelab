@@ -1,6 +1,6 @@
 # Matter controller for Home Assistant (matter.js-based drop-in for python-matter-server).
 # hostNetwork: Matter is IPv6 link-local + mDNS on Trusted, and Thread devices are reached
-# through the SLZB-MR1U border router via RA-learned routes (see talos/patches/machine-sysctls-thread.yaml).
+# through the SLZB-MR1U border router via RA-learned routes (see talos/patches/controlplane/machine-sysctls-thread.yaml).
 # The /data PVC is the fabric identity: losing it means re-commissioning every Matter device.
 apiVersion: apps/v1
 kind: Deployment

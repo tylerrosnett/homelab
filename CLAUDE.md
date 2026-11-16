@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 GitOps configuration for a 3-node Talos Linux Kubernetes homelab. Flat layout — everything cluster-related lives under `clusters/homelab/` (single cluster, no need to split apps from infra across directories):
 
-- `talos/` — Talos node configuration via [talhelper](https://github.com/budimanjojo/talhelper); `talconfig.yaml` is the single source of truth.
+- `talos/` — Talos node configuration rendered by `genconfig.sh` with plain `talosctl` (no talhelper since 2026-11-16). Layout and workflow in `talos/README.md`.
 - `clusters/homelab/flux-system/` — Flux bootstrap (flux-operator + FluxInstance) and root Kustomizations for the `homelab` cluster.
 - `clusters/homelab/cloudflare/` — Cloudflare DNS records that are not derived from an HTTPRoute, as ExternalDNS `DNSEndpoint` CRs in the `external-dns` namespace (`dns/dnsendpoints.yaml`: Proton MX/DKIM/SPF/DMARC, Google site verification, the `*.tylerrosnett.com` tunnel CNAME, and the apex `AAAA 100::` placeholder for the `tylerrosnett-com` Worker route). Crossplane used to manage these (removed 2026-10-09); the whole zone is ExternalDNS-owned now. See the ExternalDNS section below before touching anything at the zone apex.
 - `clusters/homelab/network/` — CNI (Cilium), Gateway API CRDs, LB IP pool / L2 announce, Gateways (internal `*.ik8s` + public `*.k8s` for Cloudflare Tunnel), ExternalDNS, cloudflared, Tailscale operator + subnet-router Connectors.
@@ -17,7 +17,7 @@ GitOps configuration for a 3-node Talos Linux Kubernetes homelab. Flat layout �
 - `clusters/homelab/apps/` — workload manifests (deployments, services, HTTPRoutes, NetworkPolicies): `whoami`, `hello-public`, `game-2048`, `headlamp` (cluster-admin dashboard with CF Access OIDC, **LAN-only**), `home-assistant` (smart-home hub + smart-plug energy metrics source), `blocky`, `outline`, `minecraft`, `ntfy` (public push notifications at `ntfy.tylerrosnett.com`, deny-all auth with SOPS-provisioned users/tokens, `upstream-base-url` pointed at ntfy.sh for iOS delivery).
 - `docs/` — gitignored local scratch, including the Aug 2026 remediation plans.
 - `.github/workflows/` — PR validation (kustomize build, kubeconform, SOPS-encryption guard).
-- `renovate.json` — config for the Mend-hosted Renovate GitHub App. Detects HelmRelease chart versions, OCI/HTTPS HelmRepositories, kustomize images, GHA digests, plus custom regex managers for `talosVersion:`/`kubernetesVersion:` in `talconfig.yaml`, the FluxInstance minor, and the flux-operator chart tag. Gateway API and ExternalDNS CRD bumps come from the flux manager watching the `gateway-api` and `external-dns` GitRepository tags; the `external-dns` tag is grouped with the external-dns chart into one PR. Schedule is 6pm–5am weekdays plus weekends. **No automerge anywhere** — every PR is merged by hand on purpose. Renovate maintains a "Dependency Dashboard" issue tracking everything it finds.
+- `renovate.json` — config for the Mend-hosted Renovate GitHub App. Detects HelmRelease chart versions, OCI/HTTPS HelmRepositories, kustomize images, GHA digests, plus custom regex managers for `TALOS_VERSION=`/`KUBERNETES_VERSION=` in `talos/versions.env`, the FluxInstance minor, and the flux-operator chart tag. Gateway API and ExternalDNS CRD bumps come from the flux manager watching the `gateway-api` and `external-dns` GitRepository tags; the `external-dns` tag is grouped with the external-dns chart into one PR. Schedule is 6pm–5am weekdays plus weekends. **No automerge anywhere** — every PR is merged by hand on purpose. Renovate maintains a "Dependency Dashboard" issue tracking everything it finds.
 
 Each subsystem follows the pattern: a directory with raw manifests + `kustomization.yaml`, and a sibling `<name>.yaml` Flux Kustomization wrapper that adds `dependsOn` and `decryption`. The root `clusters/homelab/kustomization.yaml` lists those wrappers.
 
@@ -25,13 +25,13 @@ Each subsystem follows the pattern: a directory with raw manifests + `kustomizat
 
 ## Cluster facts (don't re-derive)
 
-- Controlplane nodes (bare metal, interface `eno1`): `oak` 10.10.10.5, `maple` 10.10.10.6, `pine` 10.10.10.7. Schedulable (`allowSchedulingOnControlPlanes: true`).
+- Controlplane nodes (bare metal, interface `eno1`): `oak` 10.10.10.5, `maple` 10.10.10.6, `pine` 10.10.10.7. Schedulable (the controlplane `KubeNodeConfig` patch sets no control-plane taint).
 - No worker nodes. The Proxmox VM workers `birch` (`homelab/node-class: game`) and `cedar` (`bulk`) were removed on 2026-09-22. Minecraft keeps its `node-class: game` nodeSelector and is scaled to 0 until a game node is added.
 - Kubernetes API VIP: `10.10.10.246` (Talos shared VIP on `eno1`).
-- **Versions live in `talos/talconfig.yaml` and Renovate bumps them — read the file, don't trust a number written here.** Note that merging a Renovate Talos/k8s PR changes only git; the rollout (`talhelper genconfig` + `talosctl upgrade`) is manual and has historically lagged.
+- **Versions live in `talos/versions.env` and Renovate bumps them — read the file, don't trust a number written here.** Note that merging a Renovate Talos/k8s PR changes only git; the rollout (`talos/genconfig.sh` + `talosctl upgrade`) is manual and has historically lagged.
 - CNI is `none` in Talos config — **Cilium is installed out-of-band**, so any networking work must account for Cilium being the actual CNI.
 - `kube-proxy` is disabled (Cilium kube-proxy replacement expected). Cilium reaches the apiserver via **KubePrism** (`localhost:7445`), not the VIP: Talos moves the VIP on etcd health, not apiserver health, so a node with healthy etcd and a sick apiserver could otherwise stall every agent.
-- Every node is a Lenovo ThinkCentre M700 Tiny (10HY001RUS) with two SATA disks; the M.2 slot has no PCIe lanes, so NVMe parts never show up. Since 2026-10-15: the 240 GB Intel D3-S4510 M.2 (`INTEL SSDSCKKB24`, power-loss protection) is the Talos system disk, selected by `installDiskSelector.model` rather than size (both disks exceed 200 GB), so etcd fsyncs land on the PLP drive (p99 went from 6-10 ms to under 2 ms). The original 256 GB `SATA SSD` holds a single Talos `UserVolumeConfig` named `longhorn` (`talos/patches/machine-longhorn-volume.yaml`, xfs, mounted at `/var/mnt/longhorn` with an `rshared` kubelet bind) and nothing else; Longhorn's `defaultDataPath` points there. Longhorn node records were switched to that path by hand on each node (patch disks, delete stuck replica records, remove the default disk); they live outside git. System extensions: `iscsi-tools`, `util-linux-tools`.
+- Every node is a Lenovo ThinkCentre M700 Tiny (10HY001RUS) with two SATA disks; the M.2 slot has no PCIe lanes, so NVMe parts never show up. Since 2026-10-15: the 240 GB Intel D3-S4510 M.2 (`INTEL SSDSCKKB24`, power-loss protection) is the Talos system disk, selected by model in each node's `UnattendedInstallConfig` (`disk.model == "INTEL SSDSCKKB24"`) rather than size (both disks exceed 200 GB), so etcd fsyncs land on the PLP drive (p99 went from 6-10 ms to under 2 ms). The original 256 GB `SATA SSD` holds a single Talos `UserVolumeConfig` named `longhorn` (`talos/patches/controlplane/machine-longhorn-volume.yaml`, xfs, mounted at `/var/mnt/longhorn`) and nothing else; Longhorn's `defaultDataPath` points there. Longhorn node records were switched to that path by hand on each node (patch disks, delete stuck replica records, remove the default disk); they live outside git. System extensions (`talos/schematics/controlplane.yaml`): `iscsi-tools`, `util-linux-tools`.
 - Kubelet uses `rotate-server-certificates: true`.
 - The apiserver audit policy logs Secrets at **`Metadata`** level, deliberately. `RequestResponse` would write every SOPS-decrypted value Flux applies into the node audit log in plaintext — and Alloy tails that log into Loki. Don't raise it.
 
@@ -40,24 +40,27 @@ Each subsystem follows the pattern: a directory with raw manifests + `kustomizat
 Talos config workflow (run from `talos/`):
 
 ```bash
-talhelper genconfig && sed -i '' 's/- name: key1/- name: key2/' clusterconfig/homelab-*.yaml   # regenerate (gitignored); the sed is mandatory while talhelper <= 3.1.17 emits secretbox key1 — cluster data is under key2
-talosctl disks --insecure --nodes <node-ip>                        # confirm disk name before apply
-talosctl apply-config --insecure --nodes <ip> --file ./clusterconfig/<hostname>.yaml
-talosctl bootstrap --nodes 10.10.10.5                             # ONCE, after all 3 nodes are up
-talosctl kubeconfig --nodes 10.10.10.246 --endpoints 10.10.10.246
+./genconfig.sh                                              # render every node into clusterconfig/ (gitignored); ./genconfig.sh <node> for one
+./dryrun.sh <node> <ip>                                     # masked diff of what apply would change; must read "No changes" after applying
+talosctl apply-config -n <ip> -e <ip> -f clusterconfig/homelab-<node>.yaml
+talosctl get disks --insecure -n <ip> -o yaml               # new machine in maintenance mode: confirm the install disk first
+talosctl bootstrap -n 10.10.10.5 -e 10.10.10.5              # ONCE, new cluster only
+talosctl kubeconfig -n 10.10.10.246 -e 10.10.10.246
 ```
+
+**Never pipe a raw `talosctl apply-config --dry-run` to the chat or a log.** It prints the config diff on stderr, so `| mask` misses it and every CA key, the SA key and the bootstrap token come through in plaintext. Use `dryrun.sh`, or `2>&1 | ./mask.sh`.
 
 Secrets:
 
 ```bash
-talhelper gensecret > talsecret.sops.yaml && sops -e -i talsecret.sops.yaml   # first time only
-sops <file>                                                                   # edit any SOPS-encrypted file
+talosctl gen secrets -o talsecret.sops.yaml && sops -e -i talsecret.sops.yaml   # new cluster only
+sops <file>                                                                     # edit any SOPS-encrypted file
 ```
 
 ## SOPS / secrets
 
 - Encryption is **age** with recipient `age1seegwzyg0ldnm2jerlpsyzkcrqctytqthwdpf0h9fs20w4nngqlqsvpaa0` (see `.sops.yaml`).
-- Auto-encrypted paths: `talos/talsecret.sops.yaml`, `talos/patches/*.sops.yaml` (encrypted Talos patches — talhelper auto-decrypts on `genconfig`), and anything matching `clusters/.*/secrets/.*\.yaml`. When creating new secret files, place them under one of these paths so `.sops.yaml` rules apply automatically — otherwise they'll be committed in plaintext.
+- Auto-encrypted paths: `talos/talsecret.sops.yaml`, `talos/patches/**/*.sops.yaml` (encrypted Talos patches — `genconfig.sh` decrypts them into a temp dir under the gitignored `clusterconfig/` and removes it on exit), and anything matching `clusters/.*/secrets/.*\.yaml`. When creating new secret files, place them under one of these paths so `.sops.yaml` rules apply automatically — otherwise they'll be committed in plaintext.
 - Non-Secret resources can also be SOPS-encrypted (e.g. the ClusterRoleBinding at `system/cluster-admin-oidc/secrets/clusterrolebinding.sops.yaml` keeps the admin email out of plaintext git). Flux's KS-level `decryption: sops` patch (in `flux-system/flux-instance.yaml`) decrypts any kind, not just `Secret`.
 - The private key lives outside the repo; `*.agekey` and `.secrets` are gitignored.
 - Private key backups (2026-08-03): Apple Passwords and Bitwarden. To restore, place the `AGE-SECRET-KEY-1...` line in `~/.config/sops/age/keys.txt` and check it with `age-keygen -y` against the recipient above.
@@ -65,8 +68,10 @@ sops <file>                                                                   # 
 
 ## Conventions
 
-- Single source of truth for node config is `talos/talconfig.yaml` + `talos/patches/*.yaml`. Don't hand-edit generated configs under `clusterconfig/`; change the source and regenerate.
-- Patches in `talos/patches/` are referenced from `talconfig.yaml` via `@./patches/...` — keep them small and single-purpose (see existing `cluster-proxy-disabled`, `cluster-scheduler-controller-bind`, `machine-kubelet`, `machine-time`). Since Talos 1.14 the `cluster.*` Kubernetes settings are multi-document kinds (`KubeProxyConfig`, `KubeAPIServerConfig`, `KubeAuditPolicyConfig`, `KubeAuthenticationConfig`, `KubeControllerManagerConfig`, `KubeSchedulerConfig`); a v1alpha1 `cluster.apiServer`/`proxy`/`network`/`scheduler`/`controllerManager` patch now fails `talhelper genconfig` with "already set in v1alpha1 config". CNI `none` needs no patch: `cniConfig.name: none` in `talconfig.yaml` simply omits the `KubeFlannelCNIConfig` document. Sensitive patches use the `.sops.yaml` suffix (e.g. `cluster-apiserver-oidc.sops.yaml`) so talhelper decrypts them at config-gen time and the plaintext only lands in gitignored `clusterconfig/`.
+- Single source of truth for node config is `talos/versions.env` + `talos/patches/{all,controlplane,worker}/` + `talos/nodes/<role>/<node>.yaml` + `talos/schematics/`. A node's folder under `nodes/` sets its role. Don't hand-edit rendered configs under `clusterconfig/`; change the source and regenerate. `clusterconfig/talhelper-baseline/` holds the last talhelper-rendered configs as a rollback point; it is not a source.
+- Keep patches small and single-purpose. `genconfig.sh` applies them in file-name order (`all/`, then the role folder, then the node file), which is why the schedulable-control-plane change is split into `-1-drop-node-config` and `-2-node-config`. Write everything in the Talos 1.14 multi-document kinds (`KubeletConfig`, `KubeNodeConfig`, `UnattendedInstallConfig`, `HostnameConfig`, `LinkConfig`, `Layer2VIPConfig`, `KubeProxyConfig`, `KubeAPIServerConfig`, `KubeAuditPolicyConfig`, `KubeAuthenticationConfig`, …); setting the same field in a v1alpha1 `machine:`/`cluster:` block and a document fails with "already set in v1alpha1 config". CNI `none` is `controlplane/cluster-cni-none.yaml`, which deletes the `KubeFlannelCNIConfig` document. Sensitive patches use the `.sops.yaml` suffix (e.g. `controlplane/cluster-apiserver-oidc.sops.yaml`).
+- Two patches pin Talos 1.14 defaults back to the pre-migration behaviour, and both matter to Longhorn: `all/security-profile.yaml` (`workloadIsolation: false`) and `all/ephemeral-volume.yaml` (EPHEMERAL `mount.secure: false`, so `/var` stays without `nosuid,nodev,noexec`; Longhorn executes engine binaries from `/var/lib/longhorn/engine-binaries`).
+- The kubelet has no bind mount for `/var/mnt/longhorn`. Talos already mounts `/var/mnt` into the kubelet, and oak was proven on 2026-11-16 (fresh volume attach + write, reboot, full rebuild) without it.
 - NTP is pinned to `time.cloudflare.com`.
 
 ## Gateway pattern (adding new apps)

@@ -1,0 +1,5 @@
+# Workload isolation runs the container plane in a sandbox namespace, which breaks
+# host iSCSI paths (Longhorn's v1 data engine depends on them).
+apiVersion: v1alpha1
+kind: SecurityProfileConfig
+workloadIsolation: false

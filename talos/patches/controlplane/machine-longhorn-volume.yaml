@@ -1,0 +1,10 @@
+apiVersion: v1alpha1
+kind: UserVolumeConfig
+name: longhorn
+provisioning:
+  diskSelector:
+    match: 'disk.model == "SATA SSD" && !system_disk'
+  minSize: 200GB
+  grow: true
+filesystem:
+  type: xfs

@@ -61,14 +61,14 @@
       "labels": ["dependencies", "talos", "manual-rollout-required"],
       "groupName": "talos",
       "prBodyNotes": [
-        "**Merging this does not upgrade anything.** Rollout is manual: `talhelper genconfig`, then `talosctl upgrade` node-by-node (oak, maple, pine, birch, cedar).",
+        "**Merging this does not upgrade anything.** Rollout is manual: `talos/genconfig.sh`, then `talosctl upgrade` node by node (oak, maple, pine).",
         "On a minor bump, check the [Talos support matrix](https://www.talos.dev/latest/introduction/support-matrix/) and raise the `kubernetes/kubernetes` `allowedVersions` ceiling in `renovate.json` to match."
       ]
     },
     {
-      "description": "K8s ceiling from the Talos support matrix (Talos 1.13 supports K8s <= 1.36). Raise this after a Talos minor upgrade, not before.",
+      "description": "K8s ceiling from the Talos support matrix (Talos 1.14 supports K8s <= 1.37). Raise this after a Talos minor upgrade, not before.",
       "matchDepNames": ["kubernetes/kubernetes"],
-      "allowedVersions": "<1.37.0"
+      "allowedVersions": "<1.38.0"
     },
     {
       "description": "K8s minor bumps must follow a Talos upgrade — approve from the Dependency Dashboard",
@@ -98,17 +98,17 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Talos version in talconfig.yaml",
-      "managerFilePatterns": ["/^talos/talconfig\\.ya?ml$/"],
-      "matchStrings": ["talosVersion:\\s*(?<currentValue>v\\S+)"],
+      "description": "Talos version in talos/versions.env",
+      "managerFilePatterns": ["/^talos/versions\\.env$/"],
+      "matchStrings": ["TALOS_VERSION=(?<currentValue>v\\S+)"],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "siderolabs/talos"
     },
     {
       "customType": "regex",
-      "description": "Kubernetes version in talconfig.yaml",
-      "managerFilePatterns": ["/^talos/talconfig\\.ya?ml$/"],
-      "matchStrings": ["kubernetesVersion:\\s*(?<currentValue>v\\S+)"],
+      "description": "Kubernetes version in talos/versions.env",
+      "managerFilePatterns": ["/^talos/versions\\.env$/"],
+      "matchStrings": ["KUBERNETES_VERSION=(?<currentValue>v\\S+)"],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "kubernetes/kubernetes"
     },
