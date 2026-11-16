@@ -34,6 +34,11 @@ spec:
       enabled: false
     hostPaths:
       driverInstallDir: /usr/local
+    # The DRA driver (helmrelease-dra-driver.yaml) allocates the GPU. Its
+    # gpu.nvidia.com DeviceClass maps the nvidia.com/gpu extended resource, so
+    # pods requesting nvidia.com/gpu still schedule.
+    devicePlugin:
+      enabled: false
     operator:
       # Flux owns the CRDs (crds: CreateReplace); the chart's pre-upgrade CRD
       # Job would only duplicate that.

@@ -1,0 +1,38 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: dra-driver-nvidia-gpu
+  namespace: gpu-operator
+spec:
+  driftDetection:
+    mode: enabled
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: dra-driver-nvidia-gpu
+      version: 0.5.1
+      sourceRef:
+        kind: HelmRepository
+        name: dra-driver-nvidia
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    # Same driver location as the operator's driverInstallDir: the Talos
+    # NVIDIA extension installs under /usr/local.
+    nvidiaDriverRoot: /usr/local
+    # Required for GPU allocation; it asserts the operator's device plugin is
+    # off (helmrelease.yaml, devicePlugin.enabled: false). Both advertising
+    # nvidia.com/gpu would double-allocate the card.
+    gpuResourcesEnabledOverride: true
+    resources:
+      # Multi-node NVLink only; a single GeForce card has none.
+      computeDomains:
+        enabled: false
