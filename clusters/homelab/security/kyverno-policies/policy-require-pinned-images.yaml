@@ -1,0 +1,107 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-pinned-images
+  annotations:
+    policies.kyverno.io/title: Require Pinned Images
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Images must specify a tag that looks like a pinned version (leading
+      digit, optionally prefixed with v) or be digest-pinned. Floating tags
+      like latest, stable, or java21 are rejected.
+spec:
+  validationActions: [Deny]
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+              - kube-system
+              - flux-system
+              - longhorn-system
+              - monitoring
+              - tailscale
+              - cert-manager
+              - kyverno
+              - home-assistant
+              - gpu-operator
+              - model-csi
+              - dragonfly
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: images
+      expression: >-
+        object.spec.containers.map(c, c.image) +
+        (has(object.spec.initContainers) ? object.spec.initContainers.map(c, c.image) : [])
+  validations:
+    - expression: "variables.images.all(i, i.contains(':'))"
+      message: An explicit image tag is required.
+    - expression: >-
+        variables.images.all(i,
+          i.matches(':(v|RELEASE[.])?[0-9][^/]*$') || i.contains('@sha256:'))
+      message: >-
+        Image tag must look like a pinned version (for example v2.27.0,
+        2025.1.0, or RELEASE.2024-12-18T13-15-44Z) or be digest-pinned.
+        Floating tags are not allowed.
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-pinned-images-audit
+  annotations:
+    policies.kyverno.io/title: Require Pinned Images
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Images must specify a tag that looks like a pinned version (leading
+      digit, optionally prefixed with v) or be digest-pinned. Floating tags
+      like latest, stable, or java21 are rejected.
+spec:
+  # Audit-only twin for the infrastructure namespaces the Deny policy skips. Fails open so
+  # a Kyverno outage can never block pods in kube-system, kyverno or longhorn-system.
+  validationActions: [Audit]
+  failurePolicy: Ignore
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values:
+              - kube-system
+              - flux-system
+              - longhorn-system
+              - monitoring
+              - tailscale
+              - cert-manager
+              - kyverno
+              - home-assistant
+              - gpu-operator
+              - model-csi
+              - dragonfly
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: images
+      expression: >-
+        object.spec.containers.map(c, c.image) +
+        (has(object.spec.initContainers) ? object.spec.initContainers.map(c, c.image) : [])
+  validations:
+    - expression: "variables.images.all(i, i.contains(':'))"
+      message: An explicit image tag is required.
+    - expression: >-
+        variables.images.all(i,
+          i.matches(':(v|RELEASE[.])?[0-9][^/]*$') || i.contains('@sha256:'))
+      message: >-
+        Image tag must look like a pinned version (for example v2.27.0,
+        2025.1.0, or RELEASE.2024-12-18T13-15-44Z) or be digest-pinned.
+        Floating tags are not allowed.
