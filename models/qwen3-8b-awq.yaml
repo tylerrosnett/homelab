@@ -1,0 +1,14 @@
+name: qwen3-8b-awq
+repo: Qwen/Qwen3-8B-AWQ
+revision: 4da05a8edb55c6046cce958586c33b61da07bb79
+family: qwen3
+paramSize: 8b
+precision: int4
+quantization: awq
+include:
+  - "*.safetensors"
+  - "*.json"
+  - "*.txt"
+  - "*.jinja"
+  - "README.md"
+  - "LICENSE"

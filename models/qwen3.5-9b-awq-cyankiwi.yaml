@@ -1,0 +1,15 @@
+# Community AWQ build (cyankiwi), not from Qwen. Under evaluation against the two official builds.
+name: qwen3.5-9b-awq-cyankiwi
+repo: cyankiwi/Qwen3.5-9B-AWQ-4bit
+revision: e4d2d39cede8c5d1716d824cd843e2889c648083
+family: qwen3.5
+paramSize: 9b
+precision: int4
+quantization: awq
+include:
+  - "*.safetensors"
+  - "*.json"
+  - "*.txt"
+  - "*.jinja"
+  - "README.md"
+  - "LICENSE"
