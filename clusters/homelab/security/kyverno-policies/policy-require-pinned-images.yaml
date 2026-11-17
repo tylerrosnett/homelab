@@ -25,6 +25,7 @@ spec:
         - home-assistant
         - gpu-operator
         - model-csi
+        - dragonfly
   background: true
   failurePolicy: Fail
   rules:

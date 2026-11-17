@@ -1,0 +1,19 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: dragonfly
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: kube-prometheus-stack   # ServiceMonitor CRD
+    - name: kyverno-policies        # dragonfly Audit override must exist before its pods
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/homelab/dragonfly
+  prune: true
+  # wait: false — dfdaemon only runs on willow, which is often absent.
+  wait: false

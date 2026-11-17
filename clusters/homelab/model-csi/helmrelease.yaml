@@ -54,6 +54,46 @@ spec:
   postRenderers:
     - kustomize:
         patches:
+          # Chart 0.1.2 cannot set pull_config (upstream main can, unreleased). Pull through the
+          # node's dfdaemon so a kubelet NodePublish timeout does not discard the download, and
+          # Dragonfly's storage doubles as the model cache.
+          - target:
+              kind: ConfigMap
+              name: config
+            patch: |
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: config
+              data:
+                config.yaml: |-
+                  service_name: model.csi.modelpack.org
+                  root_dir: /var/lib/model-csi
+                  csi_endpoint: unix:///csi/csi.sock
+                  pull_config:
+                    dragonfly_endpoint: unix:///var/run/dragonfly/dfdaemon.sock
+          # The driver stats the socket at startup, so it needs the host dir dfdaemon creates.
+          - target:
+              kind: DaemonSet
+              name: model-csi-driver
+            patch: |
+              apiVersion: apps/v1
+              kind: DaemonSet
+              metadata:
+                name: model-csi-driver
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: model-csi-driver
+                        volumeMounts:
+                          - name: dragonfly-socket
+                            mountPath: /var/run/dragonfly
+                    volumes:
+                      - name: dragonfly-socket
+                        hostPath:
+                          path: /var/run/dragonfly
+                          type: DirectoryOrCreate
           - target:
               kind: DaemonSet
               name: model-csi-driver

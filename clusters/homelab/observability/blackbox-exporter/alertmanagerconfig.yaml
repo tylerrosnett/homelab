@@ -18,7 +18,7 @@ spec:
         value: "warning|critical"
   # While GPUNodeAway fires (gpu/prometheusrule.yaml), silence what a powered-off
   # willow raises. Most of these alerts carry no node label, so the scoping is by
-  # what runs on willow: anything in gpu-operator, inference or model-csi, the three
+  # what runs on willow: anything in gpu-operator, inference, model-csi or dragonfly, the three
   # DaemonSets that also run there, and the kubelet/node-exporter scrape jobs. A real failure of those
   # on another node is hidden too while willow is away.
   inhibitRules:
@@ -36,7 +36,7 @@ spec:
       targetMatch:
         - name: namespace
           matchType: "=~"
-          value: "gpu-operator|inference|model-csi"
+          value: "gpu-operator|inference|model-csi|dragonfly"
     - sourceMatch:
         - name: alertname
           value: GPUNodeAway

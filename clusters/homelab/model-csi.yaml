@@ -6,6 +6,7 @@ metadata:
 spec:
   dependsOn:
     - name: kyverno-policies        # model-csi Audit override must exist before its pods
+    - name: dragonfly               # dfdaemon socket the driver pulls through
   decryption:
     provider: sops
     secretRef:

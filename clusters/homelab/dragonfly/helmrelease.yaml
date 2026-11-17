@@ -1,0 +1,85 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: dragonfly
+  namespace: dragonfly
+spec:
+  driftDetection:
+    mode: enabled
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: dragonfly
+      version: 1.10.1
+      sourceRef:
+        kind: HelmRepository
+        name: dragonfly
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    # Manager-less: no manager, MySQL/Postgres or Redis. Clients reach the scheduler through
+    # the chart's static dynconfig.yaml.
+    manager:
+      enable: false
+    scheduler:
+      replicas: 1
+      image:
+        digest: sha256:b9d27b9db12c1099d1e370a9ff9cf4db58fe42dab420ea827762b52f8925fc82
+      metrics:
+        enable: true
+        serviceMonitor:
+          enable: true
+    seedClient:
+      enable: false
+    client:
+      image:
+        digest: sha256:db6490a4d7ac8fe0975af0a1b84d8dd6c1fc022d351d4944b91626c147b42603
+      initContainer:
+        image:
+          tag: 1.38.0
+          digest: sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
+      # Talos's containerd config is immutable; dfinit would try to rewrite it.
+      dfinit:
+        enable: false
+      nodeSelector:
+        homelab/node-class: gpu
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      config:
+        gc:
+          policy:
+            # About half of willow's EPHEMERAL; the percentage thresholds apply to this.
+            diskThreshold: 110GiB
+      # storage: hostPath, not the chart's emptyDir, so the cache survives pod and node restarts.
+      # model-csi: the driver passes OutputPath under its root_dir and dfdaemon writes there
+      # (hardlink from storage; both dirs are on EPHEMERAL), so it must see the same host path.
+      extraVolumes:
+        - name: storage
+          hostPath:
+            path: /var/lib/dragonfly
+            type: DirectoryOrCreate
+        - name: logs
+          emptyDir: {}
+        - name: model-csi
+          hostPath:
+            path: /var/lib/model-csi
+            type: DirectoryOrCreate
+      extraVolumeMounts:
+        - name: storage
+          mountPath: /var/lib/dragonfly/
+        - name: logs
+          mountPath: /var/log/dragonfly/dfdaemon/
+        - name: model-csi
+          mountPath: /var/lib/model-csi
+      metrics:
+        enable: true
+        serviceMonitor:
+          enable: true
