@@ -6,6 +6,8 @@ resources:
   - system/cluster-admin-oidc
   - cloudflare/dns.yaml
   - network/gateway-api.yaml
+  - network/inference-extension-crds.yaml
+  - network/agentgateway.yaml
   - network/cilium.yaml
   - network/cilium-loadbalancer.yaml
   - security/cert-manager.yaml

@@ -1,0 +1,22 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: agentgateway-crds
+  namespace: agentgateway-system
+spec:
+  interval: 30m
+  timeout: 5m
+  chart:
+    spec:
+      chart: agentgateway-crds
+      version: v1.7.0
+      sourceRef:
+        kind: HelmRepository
+        name: agentgateway
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3

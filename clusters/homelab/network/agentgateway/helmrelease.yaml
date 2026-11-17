@@ -1,0 +1,52 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: agentgateway
+  namespace: agentgateway-system
+spec:
+  dependsOn:
+    - name: agentgateway-crds
+  driftDetection:
+    mode: enabled
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: agentgateway
+      version: v1.7.0
+      sourceRef:
+        kind: HelmRepository
+        name: agentgateway
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    controller:
+      image:
+        tag: v1.7.0@sha256:87c1363bf0cbc7fdb375866e592294114c8763097d2d0c9fc45fcb1fe00a4ab8
+    # Data-plane image the controller deploys for each Gateway.
+    proxy:
+      image:
+        tag: v1.7.0@sha256:60216aafb03d37f94e952ff3d51d2f630a65b10ecaebdc0a864882f92610c45b
+    # Needed for HTTPRoute backendRefs to InferencePool. Cilium does not implement it.
+    inferenceExtension:
+      enabled: true
+    podSecurityContext:
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: ["ALL"]
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
