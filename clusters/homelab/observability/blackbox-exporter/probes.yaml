@@ -16,6 +16,7 @@ spec:
         - https://hello.tylerrosnett.com
         - https://2048.tylerrosnett.com
         - https://outline.tylerrosnett.com
+        - https://llm.tylerrosnett.com
         - https://files.tylerrosnett.com
         - https://ntfy.tylerrosnett.com
       labels:

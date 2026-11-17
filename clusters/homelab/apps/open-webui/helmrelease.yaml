@@ -1,0 +1,125 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: open-webui
+  namespace: open-webui
+spec:
+  driftDetection:
+    mode: enabled
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: open-webui
+      version: 18.3.0
+      sourceRef:
+        kind: HelmRepository
+        name: open-webui
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    image:
+      tag: 0.13.3@sha256:46b59158e6558eeb980bc828e0f1b30238ad24d82ed84d5e5eda1dab2a082f14
+    ollama:
+      enabled: false
+    pipelines:
+      enabled: false
+    tika:
+      enabled: false
+    terminals:
+      enabled: false
+    # Single replica: the in-memory websocket manager is enough, no Redis.
+    websocket:
+      enabled: true
+      manager: ""
+      redis:
+        enabled: false
+    # Talk to the inference gateway directly (in-cluster), not through Cilium.
+    enableOpenaiApi: true
+    openaiBaseApiUrl: http://inference-gateway.inference.svc.cluster.local:8080/v1
+    persistence:
+      enabled: true
+      size: 5Gi
+    # The chart runs a StatefulSet, which stops the old pod before starting the new one, so the
+    # RWO Longhorn volume needs no Recreate strategy (StatefulSets reject that value anyway).
+    copyAppData:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+    startupProbe:
+      httpGet:
+        path: /health
+        port: http
+      periodSeconds: 10
+      failureThreshold: 30
+    readinessProbe:
+      httpGet:
+        path: /health
+        port: http
+      periodSeconds: 10
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: http
+      periodSeconds: 30
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+    extraEnvVars:
+      # Env always wins over values saved in the database, so git stays the source of truth.
+      - name: ENABLE_PERSISTENT_CONFIG
+        value: "false"
+      - name: WEBUI_URL
+        value: https://llm.tylerrosnett.com
+      - name: ENABLE_OLLAMA_API
+        value: "false"
+      # Login only through Cloudflare Access OIDC. No password form, no local signup, and no
+      # trusted-header auth (WEBUI_AUTH_TRUSTED_EMAIL_HEADER stays unset): cf-tunnel is also
+      # reachable from the LAN, so a forged Cf-Access-* header must never log anyone in.
+      - name: ENABLE_LOGIN_FORM
+        value: "false"
+      - name: ENABLE_PASSWORD_AUTH
+        value: "false"
+      - name: ENABLE_SIGNUP
+        value: "false"
+      # Passing Access is the approval: first OIDC login creates an active user.
+      - name: ENABLE_OAUTH_SIGNUP
+        value: "true"
+      - name: DEFAULT_USER_ROLE
+        value: user
+      - name: OAUTH_PROVIDER_NAME
+        value: GitHub
+      - name: OAUTH_SCOPES
+        value: openid email profile
+      - name: OAUTH_CODE_CHALLENGE_METHOD
+        value: S256
+      - name: OPENID_REDIRECT_URI
+        value: https://llm.tylerrosnett.com/oauth/oidc/login/callback
+      - name: ENABLE_API_KEYS
+        value: "true"
+      - name: USER_PERMISSIONS_FEATURES_API_KEYS
+        value: "true"
+      - name: OAUTH_CLIENT_ID
+        valueFrom:
+          secretKeyRef:
+            name: open-webui-oidc
+            key: OAUTH_CLIENT_ID
+      - name: OAUTH_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: open-webui-oidc
+            key: OAUTH_CLIENT_SECRET
+      - name: OPENID_PROVIDER_URL
+        valueFrom:
+          secretKeyRef:
+            name: open-webui-oidc
+            key: OPENID_PROVIDER_URL
