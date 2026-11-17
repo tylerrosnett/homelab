@@ -96,10 +96,12 @@ jobs:
           REVISION: ${{ steps.spec.outputs.revision }}
           INCLUDE: ${{ steps.spec.outputs.include }}
         run: |
-          mapfile -t patterns < <(echo "$INCLUDE" | jq -r '.[]')
-          hf download "$REPO" --revision "$REVISION" --local-dir work --include "${patterns[@]}"
+          args=()
+          while IFS= read -r p; do args+=(--include "$p"); done < <(echo "$INCLUDE" | jq -r '.[]')
+          hf download "$REPO" --revision "$REVISION" --local-dir work "${args[@]}"
           rm -rf work/.cache
           ls -la work
+          compgen -G 'work/*.safetensors' >/dev/null || { echo "no *.safetensors downloaded"; exit 1; }
 
       - name: Build and push ModelPack artifact
         env:
