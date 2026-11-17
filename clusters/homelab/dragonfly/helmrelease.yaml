@@ -54,6 +54,19 @@ spec:
           operator: Exists
           effect: NoSchedule
       config:
+        # hostNetwork: unbound, these listen on willow's LAN address. The proxy is an open forward
+        # proxy into ClusterIPs and pod IPs; upload/storage serve cached pieces of private models.
+        # Single peer, so nothing outside the node needs them. Metrics (4002) stays open for
+        # Prometheus. The chart's top-level proxy.ip/storage.ip keys are not read by dfdaemon.
+        proxy:
+          server:
+            ip: 127.0.0.1
+        upload:
+          server:
+            ip: 127.0.0.1
+        storage:
+          server:
+            ip: 127.0.0.1
         gc:
           policy:
             # About half of willow's EPHEMERAL; the percentage thresholds apply to this.
