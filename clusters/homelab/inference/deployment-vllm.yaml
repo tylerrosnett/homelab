@@ -20,6 +20,9 @@ spec:
       labels:
         app: vllm
     spec:
+      # The Service named vllm would inject VLLM_PORT=tcp://..., which vLLM reads as its
+      # own config and refuses to start.
+      enableServiceLinks: false
       nodeSelector:
         homelab/node-class: gpu
       tolerations:
