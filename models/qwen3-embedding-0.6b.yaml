@@ -1,0 +1,11 @@
+name: qwen3-embedding-0.6b
+repo: Qwen/Qwen3-Embedding-0.6B
+revision: 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
+family: qwen3
+paramSize: 0.6b
+precision: bf16
+include:
+  - "*.safetensors"
+  - "*.json"
+  - "*.txt"
+  - "README.md"
