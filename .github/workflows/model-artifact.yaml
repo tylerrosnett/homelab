@@ -18,9 +18,12 @@ permissions:
   packages: write
 
 env:
+  # v0.2.1 is the last release that writes the CNCF identifiers (vnd.cncf.*).
+  # v0.2.1-cnai, v0.2.2 and v0.2.3 deliberately emit the legacy vnd.cnai.* names for
+  # registries keyed on them; GHCR is not one. Check the tag message before bumping.
   # renovate: datasource=github-releases depName=modelpack/modctl
-  MODCTL_VERSION: v0.2.2
-  MODCTL_SHA256: 8895eb3d3ef9e345e71ac75ac105d28672521065ede2ec45c8f6539b25513c03
+  MODCTL_VERSION: v0.2.1
+  MODCTL_SHA256: f1afdb9fd49f34447f24da9cdc7e359a9715f04ecc61363b014dee46efa02e48
   # renovate: datasource=pypi depName=huggingface_hub
   HF_HUB_VERSION: 2.4.0
 
