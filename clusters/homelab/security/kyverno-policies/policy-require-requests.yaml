@@ -23,6 +23,7 @@ spec:
         - kyverno
         - home-assistant
         - gpu-operator
+        - model-csi
   background: true
   failurePolicy: Fail
   rules:

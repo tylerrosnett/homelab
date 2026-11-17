@@ -1,0 +1,73 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: model-csi-driver
+  namespace: model-csi
+spec:
+  driftDetection:
+    mode: enabled
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: model-csi-driver
+      version: 0.1.2
+      sourceRef:
+        kind: HelmRepository
+        name: modelpack
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    # The chart hardcodes namespace model-csi on its ConfigMaps and ServiceAccount.
+    namespace: model-csi
+    # Defaults are an unqualified repository at tag latest.
+    image:
+      repository: ghcr.io/modelpack/model-csi-driver
+      tag: v0.1.2@sha256:474009f182c0556051f979f0649c05d84888c78f203a06cd61cc16cac4bd27e8
+    # Default points at the frozen k8s.gcr.io.
+    registrar:
+      image:
+        repository: registry.k8s.io/sig-storage/csi-node-driver-registrar
+        tag: v2.18.0@sha256:b7fefd08651f00ac4df1a196ed4c621c2451fbb899297fe9fad9e36c667af0c0
+    config:
+      rootDir: /var/lib/model-csi
+      # Left empty on purpose: the chart renders registryAuths into a plain ConfigMap.
+      # The postRenderer below mounts the SOPS Secret in its place.
+      registryAuths: {}
+    nodeSelector:
+      homelab/node-class: gpu
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 1Gi
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: DaemonSet
+              name: model-csi-driver
+            patch: |
+              apiVersion: apps/v1
+              kind: DaemonSet
+              metadata:
+                name: model-csi-driver
+              spec:
+                template:
+                  spec:
+                    volumes:
+                      - name: docker-config-dir
+                        configMap: null
+                        secret:
+                          secretName: model-registry-auth
+                          defaultMode: 0400

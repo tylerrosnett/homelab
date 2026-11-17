@@ -27,4 +27,5 @@ resources:
   - observability/extra-dashboards.yaml
   - observability/blackbox-exporter.yaml
   - gpu.yaml
+  - model-csi.yaml
   - apps.yaml
