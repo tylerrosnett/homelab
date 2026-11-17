@@ -1,0 +1,145 @@
+---
+name: model-artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      spec:
+        description: Model spec file, e.g. models/smollm2-135m.yaml
+        required: true
+  push:
+    branches:
+      - main
+    paths:
+      - "models/*.yaml"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # renovate: datasource=github-releases depName=modelpack/modctl
+  MODCTL_VERSION: v0.2.2
+  MODCTL_SHA256: 8895eb3d3ef9e345e71ac75ac105d28672521065ede2ec45c8f6539b25513c03
+  # renovate: datasource=pypi depName=huggingface_hub
+  HF_HUB_VERSION: 2.4.0
+
+jobs:
+  specs:
+    runs-on: ubuntu-latest
+    outputs:
+      specs: ${{ steps.list.outputs.specs }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - id: list
+        env:
+          INPUT_SPEC: ${{ inputs.spec }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ]; then
+            files="$INPUT_SPEC"
+          else
+            files=$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- 'models/*.yaml')
+          fi
+          echo "specs=$(printf '%s\n' $files | jq -R . | jq -sc 'map(select(length>0))')" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: specs
+    if: needs.specs.outputs.specs != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        spec: ${{ fromJSON(needs.specs.outputs.specs) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Free runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Read spec
+        id: spec
+        env:
+          SPEC: ${{ matrix.spec }}
+        run: |
+          case "$SPEC" in models/*.yaml) ;; *) echo "spec must be models/<name>.yaml"; exit 1;; esac
+          test -f "$SPEC"
+          yq -e '.name and .repo and (.revision|test("^[0-9a-f]{40}$")) and (.include|length>0)' "$SPEC" >/dev/null
+          {
+            echo "name=$(yq '.name' "$SPEC")"
+            echo "repo=$(yq '.repo' "$SPEC")"
+            echo "revision=$(yq '.revision' "$SPEC")"
+            echo "family=$(yq '.family // ""' "$SPEC")"
+            echo "paramsize=$(yq '.paramSize // ""' "$SPEC")"
+            echo "precision=$(yq '.precision // ""' "$SPEC")"
+            echo "quantization=$(yq '.quantization // ""' "$SPEC")"
+            echo "include=$(yq -o=json -I=0 '.include' "$SPEC")"
+          } >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/models/$(yq '.name' "$SPEC")" >> "$GITHUB_OUTPUT"
+
+      - name: Install tools
+        run: |
+          pip install --quiet "huggingface_hub==${HF_HUB_VERSION}"
+          curl -sSfLo modctl.tar.gz "https://github.com/modelpack/modctl/releases/download/${MODCTL_VERSION}/modctl-${MODCTL_VERSION#v}-linux-amd64.tar.gz"
+          echo "${MODCTL_SHA256}  modctl.tar.gz" | sha256sum -c -
+          tar -xzf modctl.tar.gz
+          sudo install "$(find . -name modctl -type f -perm -u+x | head -1)" /usr/local/bin/modctl
+          modctl --help >/dev/null
+
+      - name: Download pinned revision
+        env:
+          REPO: ${{ steps.spec.outputs.repo }}
+          REVISION: ${{ steps.spec.outputs.revision }}
+          INCLUDE: ${{ steps.spec.outputs.include }}
+        run: |
+          mapfile -t patterns < <(echo "$INCLUDE" | jq -r '.[]')
+          hf download "$REPO" --revision "$REVISION" --local-dir work --include "${patterns[@]}"
+          rm -rf work/.cache
+          ls -la work
+
+      - name: Build and push ModelPack artifact
+        env:
+          NAME: ${{ steps.spec.outputs.name }}
+          REPO: ${{ steps.spec.outputs.repo }}
+          REVISION: ${{ steps.spec.outputs.revision }}
+          FAMILY: ${{ steps.spec.outputs.family }}
+          PARAMSIZE: ${{ steps.spec.outputs.paramsize }}
+          PRECISION: ${{ steps.spec.outputs.precision }}
+          QUANTIZATION: ${{ steps.spec.outputs.quantization }}
+          IMAGE: ${{ steps.spec.outputs.image }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          args=(--name "$NAME" --arch transformer --format safetensors)
+          [ -n "$FAMILY" ] && args+=(--family "$FAMILY")
+          [ -n "$PARAMSIZE" ] && args+=(--param-size "$PARAMSIZE")
+          [ -n "$PRECISION" ] && args+=(--precision "$PRECISION")
+          [ -n "$QUANTIZATION" ] && args+=(--quantization "$QUANTIZATION")
+          modctl modelfile generate work "${args[@]}" --output work
+          cat work/Modelfile
+          echo "$GH_TOKEN" | modctl login -u "$GITHUB_ACTOR" --password-stdin ghcr.io
+          modctl build work -f work/Modelfile -t "$IMAGE:$REVISION" \
+            --output-remote --no-creation-time \
+            --source-url "https://huggingface.co/$REPO" --source-revision "$REVISION"
+
+      - name: Record digest
+        env:
+          NAME: ${{ steps.spec.outputs.name }}
+          IMAGE: ${{ steps.spec.outputs.image }}
+          REVISION: ${{ steps.spec.outputs.revision }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          path="${IMAGE#ghcr.io/}"
+          token=$(curl -sSf -u "$GITHUB_ACTOR:$GH_TOKEN" "https://ghcr.io/token?scope=repository:${path}:pull" | jq -r .token)
+          digest=$(curl -sSfI -H "Authorization: Bearer $token" \
+            -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+            "https://ghcr.io/v2/${path}/manifests/${REVISION}" | awk -F': ' 'tolower($1)=="docker-content-digest"{print $2}' | tr -d '\r')
+          test -n "$digest"
+          {
+            echo "### ${NAME}"
+            echo
+            echo "\`${IMAGE}@${digest}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

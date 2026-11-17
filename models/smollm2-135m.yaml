@@ -1,0 +1,12 @@
+# Trial model for the model-csi-driver mount test; small enough to build in a minute.
+name: smollm2-135m
+repo: HuggingFaceTB/SmolLM2-135M-Instruct
+revision: 12fd25f77366fa6b3b4b768ec3050bf629380bac
+family: llama
+paramSize: 135m
+precision: bf16
+include:
+  - "*.safetensors"
+  - "*.json"
+  - "merges.txt"
+  - "*.md"
