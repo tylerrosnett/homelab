@@ -1,5 +1,5 @@
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
 metadata:
   name: require-cnp-in-public-namespaces
   annotations:
@@ -11,31 +11,23 @@ metadata:
       and must contain a CiliumNetworkPolicy restricting ingress. Standard
       NetworkPolicy does not match Cilium's envoy-on-hostNetwork traffic.
 spec:
-  validationFailureAction: Audit
-  background: true
+  validationActions: [Audit]
   failurePolicy: Ignore
-  rules:
-    - name: require-cnp
-      match:
-        any:
-          - resources:
-              kinds:
-                - Namespace
-              selector:
-                matchLabels:
-                  expose-public: "true"
-      context:
-        - name: cnpCount
-          apiCall:
-            urlPath: "/apis/cilium.io/v2/namespaces/{{ request.object.metadata.name }}/ciliumnetworkpolicies"
-            jmesPath: "items | length(@)"
-      validate:
-        message: >-
-          Publicly exposed namespaces must contain a CiliumNetworkPolicy.
-          See apps/hello-public/networkpolicy.yaml for the template.
-        deny:
-          conditions:
-            all:
-              - key: "{{ cnpCount }}"
-                operator: Equals
-                value: 0
+  matchConstraints:
+    objectSelector:
+      matchLabels:
+        expose-public: "true"
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [namespaces]
+  variables:
+    - name: cnps
+      expression: >-
+        resource.List("cilium.io/v2", "ciliumnetworkpolicies", object.metadata.name)
+  validations:
+    - expression: "size(variables.cnps.items) > 0"
+      message: >-
+        Publicly exposed namespaces must contain a CiliumNetworkPolicy.
+        See apps/hello-public/networkpolicy.yaml for the template.

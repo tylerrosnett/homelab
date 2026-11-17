@@ -1,9 +1,8 @@
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
 metadata:
   name: require-probes
   annotations:
-    pod-policies.kyverno.io/autogen-controllers: DaemonSet,Deployment,StatefulSet
     policies.kyverno.io/title: Require Pod Probes
     policies.kyverno.io/severity: medium
     policies.kyverno.io/subject: Pod
@@ -12,56 +11,107 @@ metadata:
       or startupProbe so deployments, restarts, and upgrades are managed
       correctly.
 spec:
-  validationFailureAction: Enforce
-  validationFailureActionOverrides:
-    - action: Audit
-      namespaces:
-        - kube-system
-        - flux-system
-        - longhorn-system
-        - monitoring
-        - tailscale
-        - cert-manager
-        - kyverno
-        - home-assistant
-        - gpu-operator
-        - model-csi
-        - dragonfly
-  background: true
+  validationActions: [Deny]
   failurePolicy: Fail
-  rules:
-    - name: validate-probes
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-      preconditions:
-        all:
-          - key: "{{request.operation || 'BACKGROUND'}}"
-            operator: AnyIn
-            value:
-              - CREATE
-              - UPDATE
-          # Job and CronJob pods are batch workloads; probes make no sense on
-          # them and requiring them would deny every helper/hook job.
-          - key: "{{ request.object.metadata.ownerReferences[0].kind || 'none' }}"
-            operator: AnyNotIn
-            value:
-              - Job
-      validate:
-        message: "Liveness, readiness, or startup probes are required for all containers."
-        foreach:
-          - list: request.object.spec.containers[]
-            deny:
-              conditions:
-                all:
-                  - key: livenessProbe
-                    operator: AllNotIn
-                    value: "{{ element.keys(@)[] }}"
-                  - key: startupProbe
-                    operator: AllNotIn
-                    value: "{{ element.keys(@)[] }}"
-                  - key: readinessProbe
-                    operator: AllNotIn
-                    value: "{{ element.keys(@)[] }}"
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+              - kube-system
+              - flux-system
+              - longhorn-system
+              - monitoring
+              - tailscale
+              - cert-manager
+              - kyverno
+              - home-assistant
+              - gpu-operator
+              - model-csi
+              - dragonfly
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  # Admission only, as before: the old policy skipped background scans.
+  evaluation:
+    background:
+      enabled: false
+  autogen:
+    podControllers:
+      controllers: [daemonsets, deployments, statefulsets]
+  matchConditions:
+    # Job and CronJob pods are batch workloads; probes make no sense on
+    # them and requiring them would deny every helper/hook job.
+    - name: not-a-job-pod
+      expression: >-
+        !has(object.metadata.ownerReferences) ||
+        size(object.metadata.ownerReferences) == 0 ||
+        object.metadata.ownerReferences[0].kind != 'Job'
+  validations:
+    - expression: >-
+        object.spec.containers.all(c,
+          has(c.livenessProbe) || has(c.readinessProbe) || has(c.startupProbe))
+      message: Liveness, readiness, or startup probes are required for all containers.
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-probes-audit
+  annotations:
+    policies.kyverno.io/title: Require Pod Probes
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Each container must define at least one of livenessProbe, readinessProbe,
+      or startupProbe so deployments, restarts, and upgrades are managed
+      correctly.
+spec:
+  # Audit-only twin for the infrastructure namespaces the Deny policy skips. Fails open so
+  # a Kyverno outage can never block pods in kube-system, kyverno or longhorn-system.
+  validationActions: [Audit]
+  failurePolicy: Ignore
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values:
+              - kube-system
+              - flux-system
+              - longhorn-system
+              - monitoring
+              - tailscale
+              - cert-manager
+              - kyverno
+              - home-assistant
+              - gpu-operator
+              - model-csi
+              - dragonfly
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  # Admission only, as before: the old policy skipped background scans.
+  evaluation:
+    background:
+      enabled: false
+  autogen:
+    podControllers:
+      controllers: [daemonsets, deployments, statefulsets]
+  matchConditions:
+    # Job and CronJob pods are batch workloads; probes make no sense on
+    # them and requiring them would deny every helper/hook job.
+    - name: not-a-job-pod
+      expression: >-
+        !has(object.metadata.ownerReferences) ||
+        size(object.metadata.ownerReferences) == 0 ||
+        object.metadata.ownerReferences[0].kind != 'Job'
+  validations:
+    - expression: >-
+        object.spec.containers.all(c,
+          has(c.livenessProbe) || has(c.readinessProbe) || has(c.startupProbe))
+      message: Liveness, readiness, or startup probes are required for all containers.
