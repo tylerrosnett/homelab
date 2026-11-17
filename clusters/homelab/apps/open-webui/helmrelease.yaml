@@ -80,8 +80,6 @@ spec:
         value: "false"
       - name: WEBUI_URL
         value: https://llm.tylerrosnett.com
-      - name: ENABLE_OLLAMA_API
-        value: "false"
       # Login only through Cloudflare Access OIDC. No password form, no local signup, and no
       # trusted-header auth (WEBUI_AUTH_TRUSTED_EMAIL_HEADER stays unset): cf-tunnel is also
       # reachable from the LAN, so a forged Cf-Access-* header must never log anyone in.
