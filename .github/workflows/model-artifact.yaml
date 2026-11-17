@@ -53,7 +53,7 @@ jobs:
     if: needs.specs.outputs.specs != '[]'
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 1
+      fail-fast: false
       matrix:
         spec: ${{ fromJSON(needs.specs.outputs.specs) }}
     steps:
