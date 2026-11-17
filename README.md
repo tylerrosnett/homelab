@@ -1,228 +1,92 @@
 # homelab
 
-A 3-node Kubernetes cluster: three second-hand Lenovo ThinkCentre thin clients, all control planes and all schedulable.
+A Talos Kubernetes cluster on three Lenovo ThinkCentre Tiny PCs, plus a gaming desktop that joins as a part-time GPU node.
 
-Everything is GitOps. Everything is declarative. The repo is the cluster — node OS config, networking, storage, observability, auth, and workloads all live here as code and are reconciled automatically. There is no `kubectl apply` step in any normal workflow; a merge to `main` is the deploy.
+## Stack
 
-The stack: [Talos Linux](https://www.talos.dev/) for the OS (immutable, API-driven, no SSH), [Flux](https://fluxcd.io/) for cluster reconciliation, [Cilium](https://cilium.io/) for networking and Gateway API, [Longhorn](https://longhorn.io/) for storage, [cert-manager](https://cert-manager.io/) + Let's Encrypt for TLS, and [Cloudflare](https://www.cloudflare.com/) for public ingress (Tunnel), DNS, and SSO (Access OIDC). Public apps reach the internet via Cloudflare Tunnel; internal apps stay on the LAN behind a wildcard TLS cert; remote access goes through a Tailscale subnet router.
-
-## Cluster
-
-| | |
+| Area | Choice |
 | --- | --- |
-| Control plane | `oak` (10.10.10.5), `maple` (10.10.10.6), `pine` (10.10.10.7) — schedulable |
-| Workers | none (Proxmox VM workers `birch`/`cedar` removed 2026-09-22) |
-| API VIP | 10.10.10.246 |
-| Talos / Kubernetes | see `talos/versions.env` (Renovate keeps it current) |
-| CNI | Cilium (kube-proxy replacement, eBPF, L2 announcements, apiserver via KubePrism) |
-| Storage | Longhorn (3 replicas, default StorageClass) |
-| Certs | cert-manager + Let's Encrypt (DNS01 via Cloudflare) |
-| DNS | ExternalDNS → Cloudflare (internal hostnames from HTTPRoutes, mail and wildcard records from DNSEndpoint CRs) |
-| Ad-blocking | Blocky — LAN DNS resolver at `10.10.10.202`, handed out by UniFi DHCP; forwards `arboretumlab.com` to bonsai |
-| Ingress | Cilium Gateway API — internal gateway on LAN, public gateway behind cloudflared |
-| Observability | kube-prometheus-stack, Loki single-binary, Grafana Alloy DaemonSet, Hubble UI |
-| Uptime monitoring | blackbox-exporter HTTP probes; alerts → Discord via Alertmanager `discord_configs` |
-| Energy monitoring | Shelly Plug US Gen4 per-node smart plugs → Home Assistant → Prometheus → Grafana |
-| Auth | Cloudflare Access SaaS OIDC → kube-apiserver, Headlamp, and kubectl (via kubelogin) |
-| Remote access | Tailscale operator with 2 HA subnet routers advertising `10.10.10.0/24` |
-| Dependency updates | Renovate (Mend-hosted) — config in `renovate.json`, opens grouped PRs nightly/weekends |
+| OS | [Talos Linux](https://www.talos.dev/), configured with `talosctl` (`talos/README.md`) |
+| GitOps | [Flux](https://fluxcd.io/) via flux-operator |
+| Network | [Cilium](https://cilium.io/): CNI, kube-proxy replacement, L2 announcements, Gateway API |
+| Storage | [Longhorn](https://longhorn.io/); [Garage](https://garagehq.deuxfleurs.fr/) for S3 |
+| TLS and DNS | cert-manager + Let's Encrypt; ExternalDNS → Cloudflare |
+| Ingress | Internal gateway on the LAN; public apps through Cloudflare Tunnel |
+| Auth | Cloudflare Access OIDC |
+| Remote access | Tailscale subnet routers |
+| Observability | kube-prometheus-stack, Loki, Alloy, blackbox-exporter |
+| Policy | Kyverno |
+| Secrets | SOPS + age |
+| Updates | Renovate, merged manually |
 
-## Repository layout
+## Nodes
+
+| Node | Role | Address |
+| --- | --- | --- |
+| `oak`, `maple`, `pine` | Control plane, schedulable | 10.10.10.5, .6, .7 |
+| `willow` | GPU worker (RTX 3080), dual-boots | 10.10.10.8 |
+| API VIP | | 10.10.10.246 |
+
+Versions: `talos/versions.env`.
+
+## Local inference
 
 ```
-talos/                              Talos node config, rendered with talosctl (see talos/README.md)
+client → Cilium Gateway → agentgateway → InferencePool (llm-d-router) → vLLM on willow
+```
+
+- **GPU:** NVIDIA GPU Operator + DRA driver
+- **Models:** [ModelPack](https://modelpack.org/) artifacts built from `models/`, mounted by the ModelPack CSI driver, pulled through [Dragonfly](https://d7y.io/)
+- **Endpoints:** `llm.internal.tylerrosnett.com` (LAN), Open WebUI at `llm.tylerrosnett.com` (Cloudflare Access)
+
+## Layout
+
+```
+talos/                  Node config, schematics, render scripts
+models/                 Model specs
 clusters/homelab/
-  flux-system/                      Flux operator + FluxInstance bootstrap
-  cloudflare/
-    dns/                            Mail + wildcard DNS records as ExternalDNS DNSEndpoint CRs
-  network/
-    gateway-api.yaml                Gateway API CRDs from upstream (tag-pinned GitRepository)
-    external-dns-crds.yaml          ExternalDNS DNSEndpoint CRD from upstream (tag-pinned GitRepository)
-    cilium/                         Cilium HelmRelease
-    cilium-loadbalancer/            IP pool + L2 announcement policy
-    gateway/                        Internal + public Gateway resources
-    external-dns/                   ExternalDNS HelmRelease + Cloudflare token
-    cloudflare-tunnel/              cloudflared Deployment + tunnel token
-    tailscale/                      Tailscale operator + OAuth secret (installs CRDs)
-    tailscale-connectors/           Connector CRs — HA pair of subnet routers (depends on operator)
-  security/
-    cert-manager/                   cert-manager HelmRelease + Cloudflare token
-    cert-manager-issuers/           Let's Encrypt staging + prod ClusterIssuers
-  storage/
-    longhorn/                       Longhorn HelmRelease (+ HTTPRoute for UI)
-    minio/                          MinIO standalone — S3 backend for Outline attachments
-  observability/
-    kube-prometheus-stack/          Prometheus + Alertmanager + Grafana (CF Access JWT)
-    loki/                           Loki single-binary
-    alloy/                          Grafana Alloy DaemonSet (logs → Loki)
-    flux-monitoring/                Flux PodMonitor + dashboards (ConfigMaps)
-    blackbox-exporter/              Blackbox probes, alert rules, Discord AlertmanagerConfig
-    extra-dashboards/               cert-manager / Cilium / Longhorn / Node Exporter / Loki / Blackbox / Blocky / Energy dashboards
-  system/
-    kubelet-csr-approver/           Auto-approves kubelet serving CSRs
-    cluster-admin-oidc/             ClusterRoleBinding (SOPS) binding CF Access user → cluster-admin
-  apps/                             Workloads (whoami, hello-public, game-2048, headlamp,
-                                    home-assistant, blocky, outline, minecraft)
-docs/                               Local notes and plans; not tracked
-renovate.json                       Renovate config (managed by Mend's hosted GitHub App)
-.github/workflows/                  PR validation: kustomize build, kubeconform, SOPS guard
+  flux-system/          Flux bootstrap
+  network/              Cilium, gateways, ExternalDNS, cloudflared, Tailscale, agentgateway
+  security/             cert-manager, Kyverno
+  storage/              Longhorn, Garage
+  observability/        Prometheus stack, Loki, Alloy, dashboards, uptime probes
+  gpu/                  GPU Operator, DRA driver
+  dragonfly/            Dragonfly scheduler, dfdaemon
+  model-csi/            ModelPack CSI driver
+  inference/            vLLM, InferencePool, inference gateway
+  system/               kubelet CSR approver, admin RBAC
+  apps/                 Workloads
 ```
 
-Pattern: each subsystem is a directory of raw manifests with a `kustomization.yaml`, paired with a sibling `<name>.yaml` Flux Kustomization wrapper that adds `dependsOn` and SOPS `decryption`. The root `clusters/homelab/kustomization.yaml` lists the wrappers.
+Each directory has a sibling `<name>.yaml` Flux Kustomization, listed in `clusters/homelab/kustomization.yaml`.
 
-Wrappers set `wait: true` rather than `healthChecks`. Flux ignores `spec.healthChecks` entirely when `spec.wait` is true, so declaring both is misleading: only `wait` is doing anything, and it already checks every resource the Kustomization applies.
+## Adding an app
 
-## Networking
+Internal (`<name>.internal.tylerrosnett.com`):
+- Namespace, Deployment, Service
+- HTTPRoute on `cilium-gateway`
 
-- **Internal apps** live at `*.internal.tylerrosnett.com`. DNS resolves to the LAN gateway IP `10.10.10.200` (L2-announced from one Cilium node). TLS terminated at the gateway using a Let's Encrypt wildcard cert (DNS01).
-- **Public apps** live at `<name>.tylerrosnett.com`. DNS is a wildcard CNAME pointing at the Cloudflare tunnel; Cloudflare terminates TLS at its edge and forwards through the tunnel to the in-cluster `cf-tunnel` Gateway over plain HTTP.
-- The public gateway gates which namespaces can attach routes by matching the `expose-public: "true"` label on the namespace.
-- L2 announcement is opt-in via the `lb-announce: "true"` label on the LoadBalancer Service (set on the internal gateway, not the public one).
+Public (`<name>.tylerrosnett.com`, one level deep):
+- Namespace labeled `expose-public: "true"`
+- Deployment, Service
+- HTTPRoute on `cf-tunnel`
+- CiliumNetworkPolicy allowing `ingress`, `host`, `remote-node`
 
-## Remote access (Tailscale)
-
-The Tailscale operator (`network/tailscale/`) runs in the `tailscale` namespace and is authenticated via an OAuth client (SOPS-encrypted secret `operator-oauth`). Two `Connector` CRs (`network/tailscale-connectors/`) each spawn a subnet-router pod that advertises `10.10.10.0/24` — HA pair: lose one, the other carries traffic.
-
-Operator + CR resources are split into two Flux Kustomizations because the Connector CRDs are installed by the operator's Helm chart; the CRs can't be applied until the CRDs exist. `tailscale-connectors` `dependsOn: tailscale` enforces the ordering.
-
-The `tailscale` namespace carries `pod-security.kubernetes.io/enforce: privileged` — subnet-router pods need privileged containers (sysctls + raw networking).
-
-Tailscale split DNS (https://login.tailscale.com/admin/dns) covers only `arboretumlab.com` → bonsai (`10.10.100.10`). Internal hostnames need no split DNS: `*.internal.tylerrosnett.com` are public Cloudflare records pointing at `10.10.10.200`, so clients with `--accept-routes` (Mac/iOS toggle "Use Tailscale Subnets") reach them from anywhere over the subnet route.
-
-Tag `tag:homelab` is auto-applied to managed devices; the corresponding `tagOwners` entry is required in the Tailscale ACL.
-
-## DNS ad-blocking (Blocky)
-
-[Blocky](https://github.com/0xERR0R/blocky) (`apps/blocky/`) is the LAN's DNS resolver and ad/tracker blocker. UniFi DHCP on the Trusted network hands out `10.10.10.202` directly (no secondary, so everything is filtered); Blocky filters against blocklists and forwards clean lookups upstream to Cloudflare over DoT. Rollback is switching Trusted's DHCP DNS back to Auto in UniFi.
-
-- 2 replicas with pod anti-affinity and a PodDisruptionBudget (`minAvailable: 1`). DNS is served on a `LoadBalancer` Service at `10.10.10.202` (L2-announced via the `lb-announce` label), ports 53 UDP+TCP, default `externalTrafficPolicy` (`Cluster`). Do **not** set it to `Local`: Cilium's L2 lease election ignores pod placement, so a node with no local backend can win the lease, answer ARP, and blackhole every LAN DNS query. The HTTP/metrics port is a separate ClusterIP backing a ServiceMonitor.
-- Blocklists: StevenBlack + hagezi pro, plus an inline allowlist. Query logging is disabled by choice — only aggregate Prometheus metrics (block rate, query totals, cache hits) are kept, surfaced via Grafana dashboard #13768.
-- Namespace PSA is `restricted` (Blocky runs non-root and only needs `NET_BIND_SERVICE` to bind `:53`).
-- Conditional forwarding sends `arboretumlab.com` and its reverse zone (`100.10.10.in-addr.arpa`) to Technitium on bonsai (`10.10.100.10`), which stays the only authoritative source for lab names.
-- Blocky reads its config only at startup; restart the Deployment after changing the ConfigMap.
-
-Note: DNS blocking only stops third-party ad/tracker domains — first-party in-app ads (Pinterest, YouTube, Instagram) come down the same domains as the content and aren't blockable this way.
-
-## Adding a new app
-
-### Internal-only
-
-```
-clusters/homelab/apps/<name>/
-  namespace.yaml          # plain namespace
-  deployment.yaml
-  service.yaml
-  httproute.yaml          # parentRef: cilium-gateway in kube-system; hostname: <name>.internal.tylerrosnett.com
-  kustomization.yaml
-```
-
-Then add `<name>` to `clusters/homelab/apps/kustomization.yaml`. ExternalDNS publishes the DNS record automatically.
-
-### Public
-
-```
-clusters/homelab/apps/<name>/
-  namespace.yaml          # MUST have label expose-public: "true" AND a non-numeric name
-  deployment.yaml         # or helmrelease.yaml + repository.yaml
-  service.yaml
-  httproute.yaml          # parentRef: cf-tunnel in kube-system; hostname: <name>.tylerrosnett.com
-  networkpolicy.yaml      # CiliumNetworkPolicy allowing fromEntities [ingress, host, remote-node]
-  kustomization.yaml
-```
-
-Then add `<name>` to `clusters/homelab/apps/kustomization.yaml`. The wildcard `*.tylerrosnett.com` CNAME points at the tunnel, so no DNS work is needed per app.
-
-Important: don't use multi-level hostnames for public apps (Cloudflare's free Universal SSL only covers one wildcard level).
-
-## Observability
-
-Stack lives in the `monitoring` namespace.
-
-- **Prometheus** (50Gi Longhorn PVC, 14d retention) — scrapes all PodMonitors/ServiceMonitors cluster-wide (KPS's `*SelectorNilUsesHelmValues: false` flips). Talos overrides: kube-controller-manager `10257`, kube-scheduler `10259`, etcd `2381`, kube-proxy disabled.
-- **Alertmanager** (5Gi PVC).
-- **Grafana** (5Gi PVC) — only public-facing piece of observability. Exposed at `grafana.tylerrosnett.com` via the `cf-tunnel` Gateway. Auth uses Cloudflare Access JWT (`auth.jwt` against CF's JWKS). Login form disabled; users auto-create as Admin on first JWT login.
-- **Loki** single-binary (50Gi PVC, filesystem store).
-- **Grafana Alloy** DaemonSet scraping every namespace's pod logs → Loki.
-- **Flux dashboards** as ConfigMaps (label `grafana_dashboard: "1"`), PodMonitor for flux-system controllers — see `observability/flux-monitoring/`.
-
-The `monitoring` namespace carries `pod-security.kubernetes.io/enforce: privileged` because node-exporter needs `hostNetwork`/`hostPID`. Grafana uses `Recreate` deployment strategy (RWO PVC + `RollingUpdate` deadlocks).
-
-Internal UIs exposed via `*.internal.tylerrosnett.com`: `longhorn`, `prometheus`, `alertmanager`, `headlamp`, `hubble` (Cilium flow observability — `hubble.relay.enabled` + `hubble.ui.enabled` on the Cilium HelmRelease), `ha` / `homeassistant` (Home Assistant).
-
-Prometheus and Alertmanager both have `externalUrl` set to their `*.internal.tylerrosnett.com` hostnames so "Source" links in Alertmanager and links in Discord notifications resolve from a browser (otherwise they'd point at cluster-internal service DNS).
-
-**Extra dashboards** (`observability/extra-dashboards/`): cert-manager, Cilium Agent, Longhorn, Node Exporter Full (grafana.com #1860), Loki, Blackbox Exporter, Blocky (grafana.com #13768), Energy / Smart Plugs (hand-written). Loaded the same way as Flux dashboards — kustomize `configMapGenerator` with `grafana_dashboard: "1"` label.
-
-## Uptime monitoring and alerts
-
-`observability/blackbox-exporter/`:
-
-- **`prometheus-blackbox-exporter` HelmRelease** with `http_2xx`, `http_2xx_insecure`, and `tcp_connect` probe modules. Exports `probe_success` / `probe_duration_seconds` / `probe_ssl_earliest_cert_expiry` metrics.
-- **`Probe` CRDs** (`public-endpoints`, `internal-endpoints`) — 8 URLs scraped every 60s, labeled `category=public|internal`. Edit `probes.yaml` to add/remove targets.
-- **`PrometheusRule`** with 4 alerts: `EndpointDown` (probe_success=0 for 3m), `EndpointSlow` (>5s for 10m), `CertExpiringSoon` (<14d), `CertExpired`.
-- **`AlertmanagerConfig`** — routes alerts with `severity =~ warning|critical` to a Discord webhook (URL in `secrets/discord-webhook.sops.yaml`). Watchdog and other low-priority alerts are filtered out by the severity matcher.
-
-KPS values include `alertmanagerConfigSelector: { matchLabels: { alertmanagerConfig: discord } }` so Alertmanager picks up the CRD.
-
-## Authentication
-
-The cluster trusts **Cloudflare Access SaaS OIDC** as an identity provider end-to-end. CF Access itself only accepts GitHub OAuth as a login method — email PIN and other IdPs are disabled in Zero Trust settings.
-
-- **kube-apiserver** validates CF Access tokens through a structured `AuthenticationConfiguration` (issuer, client ID as audience, username from `email`), set by a SOPS-encrypted Talos patch (`talos/patches/controlplane/cluster-apiserver-oidc.sops.yaml`). `talos/genconfig.sh` decrypts it while rendering, so the plaintext only lands in the gitignored `clusterconfig/`.
-- **ClusterRoleBinding** at `clusters/homelab/system/cluster-admin-oidc/secrets/clusterrolebinding.sops.yaml` (SOPS-encrypted) maps the CF Access user email → `cluster-admin`.
-- **Headlamp** uses the same SaaS OIDC app via browser flow at `headlamp.internal.tylerrosnett.com/oidc-callback`. Helm values are injected from the encrypted `headlamp-oidc` secret via Flux's `valuesFrom` to work around a chart bug where `secret.create: false` skips OIDC env injection.
-- **kubectl** uses [`kubelogin`](https://github.com/int128/kubelogin) against the same SaaS app with redirect `http://localhost:8000`. The app has **Allow PKCE without Client Secret** on, so kubectl runs as a public client with no secret on disk.
-
-**CF Access SaaS OIDC quirks** that took a while to debug:
-- **PKCE is required**. Both Headlamp (`usePKCE: true`) and kubelogin (`--oidc-pkce-method=S256`) must opt in. CF rejects with `code_challenge is required for this client` otherwise.
-- **Refresh tokens require explicit opt-in** on the SaaS app (toggle in OIDC settings). Once enabled, request `offline_access` scope so sessions silently refresh. Without it, clients re-auth on every access-token expiry (~10 min).
-- **Group claims need an IdP source** (e.g. GitHub teams). Custom claims on the SaaS app can only map IdP attributes, not literal strings or Rule Groups. Email-based RBAC is the practical fallback for single-user homelabs.
+Add the app to `clusters/homelab/apps/kustomization.yaml`.
 
 ## Secrets
 
-Encrypted with [sops](https://github.com/getsops/sops) + age. Files matching `clusters/.*/secrets/.*\.yaml` are auto-encrypted by the `.sops.yaml` rules. The age private key lives outside the repo.
-
-The `.sops.yaml` rules only apply when you actually run `sops`. Writing a plaintext Secret to one of those paths and committing it without encrypting is accepted silently by git, so CI has a job that fails on any tracked secret file lacking SOPS markers.
-
-**The age key is the cluster's single point of failure.** It decrypts `talsecret.sops.yaml`, which holds the cluster and etcd CAs; lose it and the running cluster cannot be reproduced from this repo. The key is backed up outside the repo; restore instructions are in CLAUDE.md.
-
-To edit an existing secret:
+SOPS + age, under `clusters/*/secrets/`:
 
 ```bash
 sops clusters/homelab/<path>/secrets/<file>.sops.yaml
 ```
 
-To create a new one, write the plaintext Secret at its destination, then `sops -e -i <file>`.
-
-## Common operations
+## Commands
 
 ```bash
-# Render Talos configs (in talos/)
-./genconfig.sh
-
-# Preview, then apply, a node's config (in talos/)
-./dryrun.sh <node> <ip>
-talosctl apply-config -n <ip> -e <ip> -f clusterconfig/homelab-<node>.yaml
-
-# Get kubeconfig
+cd talos && ./genconfig.sh && ./dryrun.sh <node> <ip>
 talosctl kubeconfig -n 10.10.10.246 -e 10.10.10.246
-
-# Force a Flux reconcile
-flux reconcile kustomization flux-system --with-source
-
-# See sync state
 flux get kustomizations
-flux get helmreleases -A
-
-# Force kubelogin to re-authenticate (e.g. after CF session expires)
-rm -rf ~/.kube/cache/oidc-login/
+flux reconcile kustomization flux-system --with-source
 ```
-
-## Notable design choices
-
-- **Cilium installed out-of-band** via Flux HelmRelease (Talos CNI is `none`). kube-proxy is disabled; Cilium's BPF kube-proxy replacement handles it.
-- **Install disks selected by size/type** (`installDiskSelector: size: '>= 200GB', type: ssd`), not fixed `/dev/sdX` paths — names aren't stable across reboots when USB media is present.
-- **flux-operator + FluxInstance** instead of the classic `flux install`. The FluxInstance is itself reconciled by a Flux HelmRelease for self-management.
-- **Two ExternalDNS scopes**: domain filter set to `tylerrosnett.com` (zone discovery requires it), and a regex filter that admits the zone apex, `*.internal.*`, the mail subdomains and the literal `*` wildcard. The apex match is required — without it, ExternalDNS silently skips every record with "no hosted zone matching record DNS Name was detected". The regex deliberately excludes `<app>.tylerrosnett.com`, so public HTTPRoutes on `cf-tunnel` resolve through the wildcard CNAME rather than getting A records for the unannounced LB IP.
-- **Public traffic terminates plaintext inside the cluster** (Cloudflare → cloudflared → public gateway is HTTP). Cilium's identity-aware policy on backend pods uses the `ingress` entity to allow only envoy-originated traffic.
-- **Talos kube-controller-manager and kube-scheduler bind to 0.0.0.0** via `patches/cluster-scheduler-controller-bind.yaml`. Default Talos behavior binds them to 127.0.0.1, so Prometheus scrapes via node IP fail. Without the patch you get perpetual `KubeSchedulerInstanceUnreachable` / `KubeControllerManagerInstanceUnreachable` / `TargetDown` alerts.
