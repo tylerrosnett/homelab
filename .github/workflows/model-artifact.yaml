@@ -106,6 +106,26 @@ jobs:
           ls -la work
           compgen -G 'work/*.safetensors' >/dev/null || { echo "no *.safetensors downloaded"; exit 1; }
 
+      # FIXME(modctl-digest-pull): the model CSI driver can only pull by tag (its modctl
+      # fetches ref.Tag() and ignores the digest), so workloads pin by tag. Tags must
+      # therefore never move: refuse to overwrite one. Drop this once digest pulls work.
+      - name: Refuse to overwrite an existing tag
+        env:
+          IMAGE: ${{ steps.spec.outputs.image }}
+          REVISION: ${{ steps.spec.outputs.revision }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          path="${IMAGE#ghcr.io/}"
+          token=$(curl -sSf -u "$GITHUB_ACTOR:$GH_TOKEN" "https://ghcr.io/token?scope=repository:${path}:pull" | jq -r .token)
+          code=$(curl -s -o /dev/null -w '%{http_code}' -I -H "Authorization: Bearer $token" \
+            -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+            "https://ghcr.io/v2/${path}/manifests/${REVISION}")
+          case "$code" in
+            404) echo "tag ${REVISION} is free" ;;
+            200) echo "::error::${IMAGE}:${REVISION} already exists; tags are immutable here. Delete the package version in GHCR first if a rebuild is really intended."; exit 1 ;;
+            *) echo "::error::unexpected HTTP ${code} checking ${IMAGE}:${REVISION}"; exit 1 ;;
+          esac
+
       - name: Build and push ModelPack artifact
         env:
           NAME: ${{ steps.spec.outputs.name }}
