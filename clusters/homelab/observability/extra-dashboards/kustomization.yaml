@@ -37,3 +37,7 @@ configMapGenerator:
     namespace: monitoring
     files:
       - dashboards/energy.json
+  - name: dashboard-vllm
+    namespace: monitoring
+    files:
+      - dashboards/vllm.json
