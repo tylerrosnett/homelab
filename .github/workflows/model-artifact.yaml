@@ -122,7 +122,11 @@ jobs:
           [ -n "$QUANTIZATION" ] && args+=(--quantization "$QUANTIZATION")
           modctl modelfile generate work "${args[@]}" --output work
           cat work/Modelfile
-          echo "$GH_TOKEN" | modctl login -u "$GITHUB_ACTOR" --password-stdin ghcr.io
+          # modctl's --password-stdin reads a TTY, which a runner lacks; an authfile keeps the token off argv.
+          authfile="$RUNNER_TEMP/ghcr-auth.json"
+          (umask 077; jq -n --arg a "$(printf '%s:%s' "$GITHUB_ACTOR" "$GH_TOKEN" | base64 -w0)" '{auths: {"ghcr.io": {auth: $a}}}' > "$authfile")
+          modctl login --authfile "$authfile" ghcr.io
+          rm -f "$authfile"
           modctl build work -f work/Modelfile -t "$IMAGE:$REVISION" \
             --output-remote --no-creation-time \
             --source-url "https://huggingface.co/$REPO" --source-revision "$REVISION"
