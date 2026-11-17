@@ -31,4 +31,5 @@ resources:
   - gpu.yaml
   - dragonfly.yaml
   - model-csi.yaml
+  - inference.yaml
   - apps.yaml

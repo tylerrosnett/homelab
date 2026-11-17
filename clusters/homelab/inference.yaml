@@ -1,0 +1,24 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: inference
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: gpu                       # gpu.nvidia.com DeviceClass for the claim
+    - name: model-csi                 # model.csi.modelpack.org driver
+    - name: agentgateway              # GatewayClass + AgentgatewayParameters CRD
+    - name: inference-extension-crds  # InferencePool CRD
+    - name: gateway                   # cilium-gateway for the internal route
+    - name: kube-prometheus-stack     # ServiceMonitor CRD
+    - name: kyverno-policies
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/homelab/inference
+  prune: true
+  # wait: false — vLLM only runs on willow, which is often absent.
+  wait: false

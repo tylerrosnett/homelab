@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: inference
+  labels:
+    app: vllm
+spec:
+  # Stays 1 while willow is away: the pod goes Pending and the GPUNodeAway inhibits
+  # silence it; it reschedules on its own when willow is back.
+  replicas: 1
+  # One GPU: a second pod could never schedule alongside the first.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+    spec:
+      nodeSelector:
+        homelab/node-class: gpu
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      resourceClaims:
+        - name: gpu
+          resourceClaimTemplateName: single-gpu
+      containers:
+        - name: vllm
+          image: docker.io/vllm/vllm-openai:v0.34.0@sha256:20fdb089454afbb324efa4110a2c025ff7b27cc1a086e07aa580b18df8ad1ce1
+          args:
+            - /models
+            - --served-model-name
+            - qwen3.5-9b
+            - --max-model-len
+            - "32768"
+            # 8 concurrent requests: fewer activation buffers leaves room for a 32k KV cache.
+            - --max-num-seqs
+            - "8"
+            # Set explicitly: vLLM 0.34's extensible KV sizing grants nothing on 10 GB with a
+            # 7.5 GiB model, although 1.49 GiB is free after weights, activations and CUDA graphs.
+            - --kv-cache-memory
+            - "1400000000"
+            - --language-model-only
+            - --reasoning-parser
+            - qwen3
+            - --enable-auto-tool-choice
+            - --tool-call-parser
+            - qwen3_coder
+          env:
+            - name: HF_HUB_OFFLINE
+              value: "1"
+          ports:
+            - name: http
+              containerPort: 8000
+          # Model load + torch.compile + CUDA graph capture take ~1-2 min after the volume mounts.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+            limits:
+              memory: 16Gi
+            claims:
+              - name: gpu
+          volumeMounts:
+            - name: model
+              mountPath: /models
+              readOnly: true
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        # FIXME(modctl-digest-pull): by tag; the driver ignores digests (see models/README.md).
+        - name: model
+          csi:
+            driver: model.csi.modelpack.org
+            readOnly: true
+            volumeAttributes:
+              model.csi.modelpack.org/reference: ghcr.io/tylerrosnett/models/qwen3.5-9b-awq-cyankiwi:e4d2d39cede8c5d1716d824cd843e2889c648083
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi

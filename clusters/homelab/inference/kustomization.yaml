@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - resourceclaimtemplate.yaml
+  - deployment-vllm.yaml
+  - service-vllm.yaml
+  - servicemonitor-vllm.yaml
+  - repository.yaml
+  - helmrelease-router.yaml
+  - gateway.yaml
+  - httproute-pool.yaml
+  - httproute-internal.yaml
