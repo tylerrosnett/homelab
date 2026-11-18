@@ -13,11 +13,14 @@ spec:
         # observability/blackbox-exporter/alertmanagerconfig.yaml key off it to
         # silence the alerts a powered-off willow would otherwise raise. Once the
         # Node object is deleted the series disappears and so does this alert.
+        # keep_firing_for covers the boot: the Node turns Ready minutes before vLLM
+        # has mounted its model and loaded it.
         - alert: GPUNodeAway
           expr: kube_node_status_condition{job="kube-state-metrics",node="willow",condition="Ready",status="true"} == 0
           for: 1m
+          keep_firing_for: 10m
           labels:
             severity: none
           annotations:
             summary: "GPU node willow is not Ready (switched off or booted into CachyOS)"
-            description: "Alerts for willow's node, its DaemonSet pods and its scrape targets are inhibited while this fires. Delete the Node object when willow is away on purpose."
+            description: "Alerts for willow's node, its DaemonSet pods and its scrape targets are inhibited while this fires and for 10 minutes after willow is Ready again. Keep the Node object while willow is away."
