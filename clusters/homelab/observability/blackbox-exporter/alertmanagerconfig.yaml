@@ -28,7 +28,7 @@ spec:
       targetMatch:
         - name: alertname
           matchType: "=~"
-          value: "KubeNodeNotReady|KubeNodeUnreachable|KubeNodeReadinessFlapping"
+          value: "KubeNodeNotReady|KubeNodeUnreachable|KubeNodeReadinessFlapping|KubeletInstanceUnreachable"
       equal: ["node"]
     - sourceMatch:
         - name: alertname
