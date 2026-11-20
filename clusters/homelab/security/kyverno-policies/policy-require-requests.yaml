@@ -29,6 +29,7 @@ spec:
               - gpu-operator
               - model-csi
               - dragonfly
+              - trivy-system
     resourceRules:
       - apiGroups: [""]
         apiVersions: [v1]
@@ -75,6 +76,7 @@ spec:
               - gpu-operator
               - model-csi
               - dragonfly
+              - trivy-system
     resourceRules:
       - apiGroups: [""]
         apiVersions: [v1]

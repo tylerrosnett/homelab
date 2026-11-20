@@ -1,0 +1,53 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: trivy-operator
+  namespace: trivy-system
+spec:
+  driftDetection:
+    mode: enabled
+  interval: 30m
+  chart:
+    spec:
+      chart: trivy-operator
+      version: 0.38.1
+      sourceRef:
+        kind: HelmRepository
+        name: aquasecurity
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    operator:
+      builtInTrivyServer: true
+      scanJobsConcurrentLimit: 3
+      # Node-collector (infra assessment + CIS compliance) checks kubelet/etcd
+      # file paths that do not exist on Talos; every finding would be noise.
+      infraAssessmentScannerEnabled: false
+      clusterComplianceEnabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+    trivy:
+      storageClassName: longhorn
+      # Scan jobs; large images (vLLM) need more than the chart's 500M.
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+    serviceMonitor:
+      enabled: true
+      labels:
+        release: kube-prometheus-stack

@@ -15,6 +15,7 @@ resources:
   - security/cert-manager-issuers.yaml
   - security/kyverno.yaml
   - security/kyverno-policies.yaml
+  - security/trivy-operator.yaml
   - network/gateway.yaml
   - network/external-dns-crds.yaml
   - network/external-dns.yaml

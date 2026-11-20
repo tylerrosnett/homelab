@@ -41,3 +41,7 @@ configMapGenerator:
     namespace: monitoring
     files:
       - dashboards/vllm.json
+  - name: dashboard-trivy-operator
+    namespace: monitoring
+    files:
+      - dashboards/trivy-operator.json
