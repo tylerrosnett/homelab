@@ -140,6 +140,16 @@
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+\\w+: (?<currentValue>v?\\S+)"
       ],
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "CNPG Postgres image in Cluster.spec.imageName (the kubernetes manager only reads `image:`). Major pinned to 17: a major bump is a CNPG major upgrade, done deliberately.",
+      "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "imageName:\\s*(?<depName>ghcr\\.io/cloudnative-pg/postgresql):(?<currentValue>\\S+)"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "regex:^(?<major>17)\\.(?<minor>\\d+)-(?<compatibility>minimal-trixie)$"
     }
   ]
 }

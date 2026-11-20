@@ -3,8 +3,15 @@ kind: Cluster
 metadata:
   name: outline-db
   namespace: outline
+  annotations:
+    # CNPG owns the PVC; pruning this Cluster deletes Outline's data, and a
+    # re-applied Cluster bootstraps an empty database. Keep until backups exist.
+    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   instances: 1
+  # Default primary PDB (minAvailable 1) makes a single instance unevictable
+  # and stalls node drains / talosctl upgrade.
+  enablePDB: false
   imageName: ghcr.io/cloudnative-pg/postgresql:17.12-minimal-trixie
   storage:
     storageClass: longhorn

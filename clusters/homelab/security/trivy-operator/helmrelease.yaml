@@ -27,6 +27,12 @@ spec:
     operator:
       builtInTrivyServer: true
       scanJobsConcurrentLimit: 3
+      # Scan jobs pull and unpack the image client-side; multi-GB images (vLLM)
+      # at 500m CPU exceed the 5m default and retry forever, re-pulling each time.
+      scanJobTimeout: 20m
+      # SbomReports for large images exceed etcd's request size and force
+      # re-scans; nothing here consumes SBOMs.
+      sbomGenerationEnabled: false
       # Node-collector (infra assessment + CIS compliance) checks kubelet/etcd
       # file paths that do not exist on Talos; every finding would be noise.
       infraAssessmentScannerEnabled: false
@@ -39,6 +45,7 @@ spec:
         memory: 512Mi
     trivy:
       storageClassName: longhorn
+      timeout: 20m0s
       # Scan jobs; large images (vLLM) need more than the chart's 500M.
       resources:
         requests:
