@@ -331,23 +331,33 @@ spec:
           access: proxy
           url: http://loki-gateway.monitoring.svc.cluster.local
           isDefault: false
+      # GF_AUTH_GENERIC_OAUTH_{CLIENT_ID,CLIENT_SECRET,AUTH_URL,TOKEN_URL,API_URL}
+      # for the shared CF Access SaaS OIDC app.
+      envFromSecrets:
+        - name: grafana-oidc
       grafana.ini:
         server:
-          root_url: https://grafana.tylerrosnett.com
+          root_url: https://grafana.internal.tylerrosnett.com
         auth:
           disable_login_form: true
-          disable_signout_menu: true
+          # Users created by the old auth.jwt login have no oauth auth_id; without
+          # this, the first OIDC login fails with "user already exists".
+          oauth_allow_insecure_email_lookup: true
         auth.anonymous:
           enabled: false
         auth.basic:
           enabled: false
-        auth.jwt:
+        auth.generic_oauth:
           enabled: true
-          header_name: Cf-Access-Jwt-Assertion
-          email_claim: email
-          username_claim: email
-          jwk_set_url: https://tylerrosnett.cloudflareaccess.com/cdn-cgi/access/certs
-          expected_claims: '{"aud": "c640c5ca28f239d554abc8174ffb6d95726dd9aacaf2af106b1b8405b01e5a42"}'
-          auto_sign_up: true
+          name: Cloudflare Access
+          auto_login: true
+          allow_sign_up: true
+          # CF Access requires PKCE for SaaS apps.
+          use_pkce: true
+          scopes: openid email profile offline_access
+          email_attribute_path: email
+          login_attribute_path: email
+          # Access is gated by the CF Access policy; anyone who passes it is Admin.
+          role_attribute_path: "'Admin'"
         users:
           auto_assign_org_role: Admin

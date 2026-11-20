@@ -12,7 +12,6 @@ spec:
   targets:
     staticConfig:
       static:
-        - https://grafana.tylerrosnett.com
         - https://hello.tylerrosnett.com
         - https://2048.tylerrosnett.com
         - https://outline.tylerrosnett.com
@@ -37,6 +36,7 @@ spec:
     staticConfig:
       static:
         - https://longhorn.internal.tylerrosnett.com
+        - https://grafana.internal.tylerrosnett.com
         - https://prometheus.internal.tylerrosnett.com
         - https://alertmanager.internal.tylerrosnett.com
         - https://headlamp.internal.tylerrosnett.com

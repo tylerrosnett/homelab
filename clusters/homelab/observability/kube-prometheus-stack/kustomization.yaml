@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - repository.yaml
+  - secrets/grafana-oidc.sops.yaml
   - helmrelease.yaml
   - grafana-httproute.yaml
   - grafana-networkpolicy.yaml

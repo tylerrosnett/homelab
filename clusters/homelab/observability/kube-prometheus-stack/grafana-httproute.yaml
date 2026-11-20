@@ -5,10 +5,11 @@ metadata:
   namespace: monitoring
 spec:
   parentRefs:
-    - name: cf-tunnel
+    - name: cilium-gateway
       namespace: kube-system
+      sectionName: https
   hostnames:
-    - grafana.tylerrosnett.com
+    - grafana.internal.tylerrosnett.com
   rules:
     - matches:
         - path:

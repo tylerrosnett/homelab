@@ -7,6 +7,10 @@ spec:
   dependsOn:
     - name: gateway
     - name: longhorn   # Prometheus / Alertmanager / Grafana PVCs
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
   interval: 10m
   retryInterval: 1m
   timeout: 15m
