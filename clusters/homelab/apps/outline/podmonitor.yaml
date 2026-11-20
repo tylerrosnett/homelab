@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  # Not "outline-db": CNPG deletes a PodMonitor with the cluster's name when
+  # spec.monitoring.enablePodMonitor is false.
+  name: outline-db-metrics
+  namespace: outline
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: outline-db
+      cnpg.io/podRole: instance
+  podMetricsEndpoints:
+    - port: metrics

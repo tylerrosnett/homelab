@@ -18,7 +18,8 @@ spec:
     limits:
       memory: 1Gi
   monitoring:
-    enablePodMonitor: true
+    # Deprecated in CNPG; scraped by podmonitor.yaml instead.
+    enablePodMonitor: false
   bootstrap:
     initdb:
       database: outline

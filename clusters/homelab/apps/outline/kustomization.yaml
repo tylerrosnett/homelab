@@ -6,5 +6,6 @@ resources:
   - secrets/outline.sops.yaml
   - helmrelease.yaml
   - cluster.yaml
+  - podmonitor.yaml
   - httproute.yaml
   - networkpolicy.yaml
