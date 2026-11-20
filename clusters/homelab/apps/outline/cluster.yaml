@@ -1,0 +1,42 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: outline-db
+  namespace: outline
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.12-minimal-trixie
+  storage:
+    storageClass: longhorn
+    size: 5Gi
+  # Requests also land on the bootstrap-controller init container and the
+  # import Job; Kyverno require-requests denies those pods without them.
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  monitoring:
+    enablePodMonitor: true
+  bootstrap:
+    initdb:
+      database: outline
+      owner: outline
+      # CNPG reads this only when it first creates the cluster.
+      import:
+        type: microservice
+        databases:
+          - outline
+        source:
+          externalCluster: bitnami
+  externalClusters:
+    - name: bitnami
+      connectionParameters:
+        host: outline-postgresql
+        user: outline
+        dbname: outline
+        sslmode: disable
+      password:
+        name: outline-secrets
+        key: postgres-password

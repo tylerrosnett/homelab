@@ -8,6 +8,7 @@ spec:
     - name: gateway                 # HTTPRoutes attach to cilium-gateway / cf-tunnel
     - name: kube-prometheus-stack   # ServiceMonitor CRDs (blocky, home-assistant)
     - name: longhorn                # storageClass for the home-assistant / minecraft PVCs
+    - name: cloudnative-pg          # Cluster CRD + webhook (outline-db)
   decryption:
     provider: sops
     secretRef:
