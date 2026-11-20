@@ -1,0 +1,43 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: reloader
+  namespace: reloader
+spec:
+  driftDetection:
+    mode: enabled
+  interval: 30m
+  chart:
+    spec:
+      chart: reloader
+      version: 2.2.20
+      sourceRef:
+        kind: HelmRepository
+        name: stakater
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    reloader:
+      # Only workloads annotated reloader.stakater.com/auto (or a specific
+      # configmap/secret.reloader.stakater.com/reload) are restarted.
+      autoReloadAll: false
+      readOnlyRootFileSystem: true
+      deployment:
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+      podMonitor:
+        enabled: true

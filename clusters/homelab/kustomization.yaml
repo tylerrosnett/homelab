@@ -4,6 +4,7 @@ resources:
   - flux-system
   - system/kubelet-csr-approver
   - system/cluster-admin-oidc
+  - system/reloader.yaml
   - cloudflare/dns.yaml
   - network/gateway-api.yaml
   - network/inference-extension-crds.yaml
