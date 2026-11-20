@@ -1,0 +1,38 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: outline-db-ingress
+  namespace: outline
+spec:
+  endpointSelector:
+    matchLabels:
+      cnpg.io/cluster: outline-db
+  ingress:
+    # kubelet probes hit the instance manager on 8000.
+    - fromEntities:
+        - host
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: outline
+            io.kubernetes.pod.namespace: outline
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    # Operator status checks; blocking them marks the instance unhealthy.
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: cloudnative-pg
+            io.kubernetes.pod.namespace: cnpg-system
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: prometheus
+            io.kubernetes.pod.namespace: monitoring
+      toPorts:
+        - ports:
+            - port: "9187"
+              protocol: TCP

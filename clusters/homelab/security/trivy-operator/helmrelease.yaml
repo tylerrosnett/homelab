@@ -24,6 +24,9 @@ spec:
     remediation:
       retries: 3
   values:
+    # vLLM's multi-GB CUDA image: findings are only fixable by a vLLM bump,
+    # which Renovate already proposes.
+    excludeNamespaces: inference
     operator:
       builtInTrivyServer: true
       scanJobsConcurrentLimit: 3

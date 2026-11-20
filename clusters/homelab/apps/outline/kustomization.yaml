@@ -9,3 +9,4 @@ resources:
   - podmonitor.yaml
   - httproute.yaml
   - networkpolicy.yaml
+  - networkpolicy-db.yaml

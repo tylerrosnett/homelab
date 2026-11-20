@@ -24,6 +24,11 @@ spec:
       memory: 256Mi
     limits:
       memory: 1Gi
+  postgresql:
+    # Inserted before CNPG's default `host all all all scram-sha-256` rule;
+    # CNPG's own connections use the local socket or hostssl certs.
+    pg_hba:
+      - hostnossl all all all reject
   monitoring:
     # Deprecated in CNPG; scraped by podmonitor.yaml instead.
     enablePodMonitor: false
