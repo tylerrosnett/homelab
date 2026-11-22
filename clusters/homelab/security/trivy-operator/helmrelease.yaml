@@ -57,6 +57,10 @@ spec:
         limits:
           cpu: 500m
           memory: 1Gi
+      server:
+        resources:
+          requests:
+            cpu: 50m
     serviceMonitor:
       enabled: true
       labels:

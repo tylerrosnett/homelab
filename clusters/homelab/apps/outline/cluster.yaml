@@ -20,7 +20,7 @@ spec:
   # Job pods; Kyverno require-requests denies those pods without them.
   resources:
     requests:
-      cpu: 250m
+      cpu: 100m
       memory: 256Mi
     limits:
       memory: 1Gi

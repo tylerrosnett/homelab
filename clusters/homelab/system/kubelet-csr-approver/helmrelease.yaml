@@ -31,3 +31,6 @@ spec:
     bypassDnsResolution: true
     # Max cert validity — 24h matches kubelet rotation default.
     maxExpirationSeconds: 86400
+    resources:
+      requests:
+        cpu: 20m
