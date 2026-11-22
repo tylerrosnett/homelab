@@ -7,6 +7,12 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 2
+  # Required anti-affinity leaves no room for a surge pod unless the third
+  # node has spare CPU requests; replace in place instead.
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: blocky
