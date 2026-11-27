@@ -283,6 +283,11 @@ spec:
         - key: nvidia.com/gpu
           operator: Exists
           effect: NoSchedule
+      # A pod deleted on a powered-off willow sticks in Terminating and holds one maxUnavailable
+      # slot until willow boots. At the chart default of 1 that stalls the rollout on every other node.
+      updateStrategy:
+        rollingUpdate:
+          maxUnavailable: 2
     prometheus:
       prometheusSpec:
         externalUrl: https://prometheus.internal.tylerrosnett.com
