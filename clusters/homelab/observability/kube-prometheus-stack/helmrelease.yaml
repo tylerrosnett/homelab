@@ -275,6 +275,14 @@ spec:
                       ready: [status, conditions, "[type=Ready]", status]
                       suspended: [spec, suspend]
                       webhook_path: [status, webhookPath]
+    prometheus-node-exporter:
+      # The chart default tolerates every NoSchedule taint, including the unreachable taint on a
+      # powered-off willow. The DaemonSet then keeps a pod desired there and Helm's wait on this
+      # release never completes. Any new tainted node needs its taint listed here.
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
     prometheus:
       prometheusSpec:
         externalUrl: https://prometheus.internal.tylerrosnett.com
