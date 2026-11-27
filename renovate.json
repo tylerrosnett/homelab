@@ -50,9 +50,9 @@
       "groupName": "flux"
     },
     {
-      "description": "Major updates wait for Dependency Dashboard approval",
+      "description": "Label major updates",
       "matchUpdateTypes": ["major"],
-      "dependencyDashboardApproval": true
+      "addLabels": ["major"]
     },
     {
       "description": "Talos version bumps need manual review + per-node rollout",
@@ -71,10 +71,13 @@
       "allowedVersions": "<1.38.0"
     },
     {
-      "description": "K8s minor bumps must follow a Talos upgrade — approve from the Dependency Dashboard",
+      "description": "K8s bumps need a manual rollout. Patch and minor updates come as separate PRs, so a pending minor does not hide patches for the running one.",
       "matchDepNames": ["kubernetes/kubernetes"],
-      "matchUpdateTypes": ["minor", "major"],
-      "dependencyDashboardApproval": true
+      "separateMinorPatch": true,
+      "labels": ["dependencies", "kubernetes", "manual-rollout-required"],
+      "prBodyNotes": [
+        "**Merging this does not upgrade anything.** Rollout is manual: `talosctl upgrade-k8s`. Merge it on the day you run the rollout: `talos/genconfig.sh` reads `KUBERNETES_VERSION`, so each config you render after the merge carries the new version."
+      ]
     },
     {
       "description": "Group the external-dns chart with the external-dns GitRepository tag that supplies the DNSEndpoint CRD (chart 1.x.0 ships app v0.x.0; the chart usually trails the tag by days, so a grouped PR may carry the tag alone)",
