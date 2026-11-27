@@ -80,14 +80,19 @@
       "description": "Group the external-dns chart with the external-dns GitRepository tag that supplies the DNSEndpoint CRD (chart 1.x.0 ships app v0.x.0; the chart usually trails the tag by days, so a grouped PR may carry the tag alone)",
       "matchPackageNames": [
         "external-dns",
-        "https://github.com/kubernetes-sigs/external-dns"
+        "kubernetes-sigs/external-dns"
       ],
       "groupName": "external-dns"
     },
     {
+      "description": "Group the Garage GitRepository tag (the chart is script/helm/garage at that tag) with the Garage image",
+      "matchPackageNames": ["deuxfleurs-org/garage", "dxflrs/amd64_garage"],
+      "groupName": "garage"
+    },
+    {
       "description": "Gateway API CRDs come straight from the upstream repo via the gateway-api GitRepository",
-      "matchDatasources": ["git-tags"],
-      "matchPackageNames": ["https://github.com/kubernetes-sigs/gateway-api"],
+      "matchDatasources": ["github-tags"],
+      "matchPackageNames": ["kubernetes-sigs/gateway-api"],
       "labels": ["dependencies", "gateway-api"],
       "prBodyNotes": [
         "Merging applies the new CRD schemas directly — Flux fetches the tag and reconciles `config/crd`.",
